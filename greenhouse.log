@@ -1,0 +1,178 @@
+2025-05-22 18:59:27,539 - app - INFO - Logging system initialized
+2025-05-22 18:59:28,128 - app - INFO - MQTT client initialized successfully
+2025-05-22 18:59:28,129 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 18:59:28,129 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 18:59:28,130 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 18:59:28,130 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 18:59:28,130 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 18:59:28,131 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 18:59:28,193 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 18:59:28,193 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 18:59:28,194 - app - INFO - Application initialized successfully
+2025-05-22 18:59:41,118 - app - INFO - Logging system initialized
+2025-05-22 18:59:41,708 - app - INFO - MQTT client initialized successfully
+2025-05-22 18:59:41,708 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 18:59:41,709 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 18:59:41,709 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 18:59:41,710 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 18:59:41,710 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 18:59:41,711 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 18:59:41,879 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 18:59:41,879 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 18:59:41,880 - app - INFO - Application initialized successfully
+2025-05-22 18:59:41,894 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 18:59:47,233 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 18:59:47,298 - app - DEBUG - Response: 500 INTERNAL SERVER ERROR
+2025-05-22 19:00:36,068 - app - INFO - Logging system initialized
+2025-05-22 19:00:36,674 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:00:36,675 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:00:36,676 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:00:36,676 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:00:36,677 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:00:36,677 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:00:36,678 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:00:36,859 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:00:36,860 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:00:36,860 - app - INFO - Application initialized successfully
+2025-05-22 19:00:36,874 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 19:01:20,986 - app - INFO - Logging system initialized
+2025-05-22 19:01:21,558 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:01:21,559 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:01:21,559 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:01:21,560 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:01:21,560 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:01:21,560 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:01:21,561 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:01:21,742 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:01:21,743 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:01:21,743 - app - INFO - Application initialized successfully
+2025-05-22 19:01:21,758 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 19:02:06,514 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:02:06,577 - app - DEBUG - Response: 200 OK
+2025-05-22 19:02:32,632 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:02:32,636 - app - DEBUG - Response: 200 OK
+2025-05-22 19:03:37,725 - app - INFO - Logging system initialized
+2025-05-22 19:03:38,346 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:03:38,346 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:03:38,347 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:03:38,348 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:03:38,349 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:03:38,349 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:03:38,349 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:03:38,433 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:03:38,434 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:03:38,434 - app - INFO - Application initialized successfully
+2025-05-22 19:03:38,449 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 19:09:13,823 - app - INFO - Logging system initialized
+2025-05-22 19:09:14,405 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:09:14,405 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:09:14,405 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:09:14,406 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:09:14,406 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:09:14,407 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:09:14,407 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:09:14,470 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:09:14,471 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:09:14,471 - app - INFO - Application initialized successfully
+2025-05-22 19:09:27,409 - app - INFO - Logging system initialized
+2025-05-22 19:09:28,012 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:09:28,012 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:09:28,013 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:09:28,013 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:09:28,014 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:09:28,014 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:09:28,014 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:09:28,178 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:09:28,178 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:09:28,179 - app - INFO - Application initialized successfully
+2025-05-22 19:09:28,194 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 19:13:23,611 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:13:23,612 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:13:23,613 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:13:23,629 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:23,687 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:23,695 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:23,868 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:13:23,868 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:23,935 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:13:23,937 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:23,993 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:13:23,995 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:28,318 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:13:28,319 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:28,634 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:13:28,636 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:13:28,636 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:28,637 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:31,152 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:13:31,166 - app - DEBUG - Response: 200 OK
+2025-05-22 19:13:31,426 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:13:31,440 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,278 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:14:00,283 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,588 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:14:00,589 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:14:00,589 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:14:00,590 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,591 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,592 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,899 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:14:00,900 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:14:00,901 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:00,901 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:05,588 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:14:05,589 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:14:05,589 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:14:05,590 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:05,591 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:05,592 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:07,029 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:14:07,034 - app - DEBUG - Response: 200 OK
+2025-05-22 19:14:07,343 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:14:07,346 - app - DEBUG - Response: 200 OK
+2025-05-22 19:15:41,531 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:15:41,534 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,459 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:16:49,459 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:16:49,459 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:16:49,463 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,464 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,466 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,715 - app - DEBUG - Request: GET /api/alerts
+2025-05-22 19:16:49,717 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,773 - app - DEBUG - Request: GET /api/devices/status
+2025-05-22 19:16:49,774 - app - DEBUG - Request: GET /api/sensors/latest
+2025-05-22 19:16:49,774 - app - DEBUG - Response: 200 OK
+2025-05-22 19:16:49,775 - app - DEBUG - Response: 200 OK
+2025-05-22 19:18:43,586 - app - INFO - Logging system initialized
+2025-05-22 19:18:44,206 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:18:44,207 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:18:44,207 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:18:44,208 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:18:44,208 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:18:44,208 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:18:44,209 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:18:44,398 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:18:44,399 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:18:44,399 - app - INFO - Application initialized successfully
+2025-05-22 19:18:44,414 - werkzeug - WARNING -  * Debugger is active!
+2025-05-22 19:21:55,095 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:21:55,174 - app - DEBUG - Response: 200 OK
+2025-05-22 19:21:55,349 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:21:55,352 - app - DEBUG - Response: 200 OK
+2025-05-22 19:22:12,472 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:22:12,476 - app - DEBUG - Response: 200 OK
+2025-05-22 19:22:27,311 - app - DEBUG - Request: GET /api/sensors/visualization
+2025-05-22 19:22:27,314 - app - DEBUG - Response: 200 OK
+2025-05-22 19:25:21,447 - app - INFO - Logging system initialized
+2025-05-22 19:25:22,044 - app - INFO - MQTT client initialized successfully
+2025-05-22 19:25:22,044 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-05-22 19:25:22,045 - app.services.monitoring - INFO - MQTT client connected
+2025-05-22 19:25:22,045 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/temperature
+2025-05-22 19:25:22,045 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/humidity
+2025-05-22 19:25:22,046 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/soil
+2025-05-22 19:25:22,046 - app.services.mqtt_client - DEBUG - Subscribed to topic: greenhouse/sensors/light
+2025-05-22 19:25:22,107 - app.services.timescale - ERROR - Failed to initialize TimescaleDB: 'Connection' object has no attribute 'commit'
+2025-05-22 19:25:22,108 - app - ERROR - Failed to initialize TimescaleDB: TimescaleDB initialization failed: 'Connection' object has no attribute 'commit'
+2025-05-22 19:25:22,109 - app - INFO - Application initialized successfully
+2025-05-22 19:25:22,123 - werkzeug - WARNING -  * Debugger is active!
