@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 
 def init_database():
     """Initialize TimescaleDB with required extensions and tables"""
-    try:
-        # Connect to postgres database to create greenhouse database
+    try:        # Connect to postgres database to create greenhouse database
         default_uri = 'postgresql://postgres:admin123@localhost:5432/postgres'
         engine = create_engine(default_uri)
         
@@ -29,9 +28,12 @@ def init_database():
                     WHERE pg_stat_activity.datname = 'greenhouse'
                     AND pid <> pg_backend_pid();
                 """))
-                # Create database
+                # Create database without transaction
+                conn.execute(text("COMMIT"))
                 conn.execute(text("CREATE DATABASE greenhouse"))
                 logger.info("Created database 'greenhouse'")
+        
+        conn.close()
         
         # Now connect to the greenhouse database
         db_uri = 'postgresql://postgres:admin123@localhost:5432/greenhouse'
@@ -56,14 +58,13 @@ def init_database():
             conn.execute(text(
                 "SELECT create_hypertable('sensor_data', 'time', if_not_exists => TRUE);"
             ))
-            
-            # Create device_states table
+              # Create device_states table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS device_states (
                     id VARCHAR(50) PRIMARY KEY,
                     type VARCHAR(50) NOT NULL,
                     name VARCHAR(100) NOT NULL,
-                    status BOOLEAN NOT NULL DEFAULT false,
+                    status VARCHAR(20) NOT NULL DEFAULT 'false',
                     last_updated TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
             """))
@@ -79,15 +80,61 @@ def init_database():
                 );
             """))
             
-            # Insert initial device data
+            # Create device_configs table
+            conn.execute(text("""                CREATE TABLE IF NOT EXISTS device_configs (
+                    device_id VARCHAR(50) PRIMARY KEY REFERENCES device_states(id),
+                    mode VARCHAR(20) NOT NULL DEFAULT 'automatic',
+                    schedule_type VARCHAR(30),
+                    start_humidity FLOAT,
+                    end_humidity FLOAT,
+                    start_temperature FLOAT,
+                    end_temperature FLOAT,
+                    duration_minutes INTEGER,
+                    check_interval_minutes INTEGER,
+                    active_hours JSONB,
+                    plant_stage VARCHAR(20),
+                    last_updated TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+              # Insert initial device data
             conn.execute(text("""
                 INSERT INTO device_states (id, type, name, status)
                 VALUES 
-                    ('fan1', 'fan', 'Quạt thông gió 1', false),
-                    ('pump1', 'pump', 'Bơm nước 1', false),
-                    ('cover1', 'cover', 'Mái che 1', false)
+                    ('fan1', 'fan', 'Quạt thông gió 1', 'false'),
+                    ('pump1', 'pump', 'Bơm nước 1', 'false'),
+                    ('cover1', 'cover', 'Mái che 1', 'CLOSED')
                 ON CONFLICT (id) DO NOTHING;
             """))
+            
+            # Insert initial device configurations
+            conn.execute(text("""                INSERT INTO device_configs (
+                    device_id, mode, schedule_type, start_humidity, end_humidity,
+                    start_temperature, end_temperature, duration_minutes, 
+                    check_interval_minutes, active_hours, plant_stage
+                )
+                VALUES 
+                    (
+                        'pump1', 'automatic', 'schedule_condition', 
+                        NULL, 60.0, NULL, NULL, 5, 120,
+                        '{"morning": ["05:00"], "evening": ["17:00"]}',
+                        'young'
+                    ),
+                    (
+                        'fan1', 'automatic', 'condition',
+                        85.0, NULL, 28.0, NULL, 15, 30,
+                        '{"all_day": true}',
+                        NULL
+                    ),
+                    (
+                        'cover1', 'automatic', 'schedule_condition',
+                        NULL, NULL, 30.0, NULL, NULL, 30,
+                        '{"peak": ["10:00-14:00"], "normal": ["06:00-10:00", "14:00-18:00"], "night": ["18:00-06:00"]}',
+                        NULL
+                    )
+                ON CONFLICT (device_id) DO NOTHING;
+            """))
+
+            # ...existing code...
             
         logger.info("Database initialized successfully")
         return True

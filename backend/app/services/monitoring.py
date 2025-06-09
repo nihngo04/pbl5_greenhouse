@@ -1,4 +1,4 @@
-import time
+﻿import time
 import logging
 from collections import defaultdict, deque
 from threading import Lock
@@ -33,10 +33,10 @@ class MQTTMonitor:
         self.error_count = 0
         self.last_error = None
         self.thresholds = {
-            'temperature': {'min': 20, 'max': 30},
-            'humidity': {'min': 60, 'max': 80},
-            'soil_moisture': {'min': 30, 'max': 70},
-            'light_intensity': {'min': 2000, 'max': 8000}
+            "temperature": {"min": 20, "max": 30},
+            "humidity": {"min": 60, "max": 80},
+            "soil_moisture": {"min": 30, "max": 70},
+            "light_intensity": {"min": 2000, "max": 8000}
         }
 
     def on_connect(self) -> None:
@@ -58,7 +58,21 @@ class MQTTMonitor:
         self.connection_status = False
         logger.info("MQTT client disconnected")
 
-    def on_message(self, topic: str) -> None:
+    def on_message_received(self, message_type: str = 'general') -> None:
+        """Called when message is received and processed successfully
+        
+        Args:
+            message_type: Type of message received (sensor_data, device_status, etc.)
+        """
+        current_time = time.time()
+        with self._lock:
+            self.message_timestamps.append(current_time)
+            self.messages_by_type[message_type].append(current_time)
+        
+        self.message_count += 1
+        logger.debug(f"Message processed successfully: {message_type}")
+
+    def on_message(self, topic: str = None) -> None:
         """Called when message is received
         
         Args:
@@ -67,7 +81,8 @@ class MQTTMonitor:
         current_time = time.time()
         with self._lock:
             self.message_timestamps.append(current_time)
-            self.messages_by_type[topic].append(current_time)
+            if topic:
+                self.messages_by_type[topic].append(current_time)
         
         self.message_count += 1
         logger.debug(f"Message received on topic: {topic}")
@@ -80,13 +95,24 @@ class MQTTMonitor:
         """
         with self._lock:
             self.errors_by_type[error_type] += 1
+            self.error_count += 1
         
-        self.error_count += 1
         self.last_error = {
-            'type': error_type,
-            'timestamp': datetime.utcnow().isoformat()
+            "type": error_type,
+            "timestamp": datetime.utcnow().isoformat()
         }
         logger.error(f"Error occurred: {error_type}")
+    
+    def on_publish(self) -> None:
+        """Record a successful message publication"""
+        with self._lock:
+            current_time = time.time()
+            self.message_timestamps.append(current_time)
+            self.messages_by_type['publish'].append(current_time)
+            
+            # Save monitoring data periodically
+            if len(self.message_timestamps) % 100 == 0:
+                self._save_monitoring_data()
 
     def check_thresholds(self, sensor_type, value):
         """Check if sensor value exceeds thresholds and create alert if needed"""
@@ -97,25 +123,24 @@ class MQTTMonitor:
         alert_message = None
         alert_type = None
 
-        if value < threshold['min']:
-            alert_message = f"{sensor_type.title()} quá thấp ({value})"
-            alert_type = 'warning'
-        elif value > threshold['max']:
-            alert_message = f"{sensor_type.title()} quá cao ({value})"
-            alert_type = 'danger'
+        if value < threshold["min"]:
+            alert_message = f"{sensor_type.title()} too low ({value})"
+            alert_type = "warning"
+        elif value > threshold["max"]:
+            alert_message = f"{sensor_type.title()} too high ({value})"
+            alert_type = "danger"
 
         if alert_message:
             try:
-                with engine.connect() as conn:
+                with engine.begin() as conn:
                     conn.execute(
                         text("""
                             INSERT INTO alerts (message, type, timestamp)
                             VALUES (:message, :type, CURRENT_TIMESTAMP)
                         """),
-                        {'message': alert_message, 'type': alert_type}
+                        {"message": alert_message, "type": alert_type}
                     )
-                    conn.commit()
-                logger.info(f"Alert created: {alert_message}")
+                    logger.info(f"Alert created: {alert_message}")
             except Exception as e:
                 logger.error(f"Failed to create alert: {e}")
 
@@ -130,12 +155,12 @@ class MQTTMonitor:
         
         with self._lock:
             # Clean old timestamps
-            while (self.message_timestamps and 
+            while (self.message_timestamps and
                    self.message_timestamps[0] < cutoff_time):
                 self.message_timestamps.popleft()
             
             for topic_timestamps in self.messages_by_type.values():
-                while (topic_timestamps and 
+                while (topic_timestamps and
                        topic_timestamps[0] < cutoff_time):
                     topic_timestamps.popleft()
             
@@ -148,31 +173,31 @@ class MQTTMonitor:
             
             # Calculate message rate (messages per second)
             if total_messages >= 2:
-                time_span = (self.message_timestamps[-1] - 
-                           self.message_timestamps[0])
+                time_span = (self.message_timestamps[-1] -
+                             self.message_timestamps[0])
                 msg_rate = total_messages / time_span if time_span > 0 else 0
             else:
                 msg_rate = 0
             
             return {
-                'connection': {
-                    'is_connected': self.is_connected,
-                    'last_connection': self.last_connection_time,
-                    'last_disconnect': self.last_disconnect_time,
-                    'connection_attempts': self.connection_attempts,
-                    'uptime': (current_time - self.last_connection_time
-                              if self.is_connected and self.last_connection_time
-                              else 0)
+                "connection": {
+                    "is_connected": self.is_connected,
+                    "last_connection": self.last_connection_time,
+                    "last_disconnect": self.last_disconnect_time,
+                    "connection_attempts": self.connection_attempts,
+                    "uptime": (current_time - self.last_connection_time
+                               if self.is_connected and self.last_connection_time
+                               else 0)
                 },
-                'messages': {
-                    'total': total_messages,
-                    'rate': msg_rate,
-                    'by_topic': messages_by_topic
+                "messages": {
+                    "total": total_messages,
+                    "rate": msg_rate,
+                    "by_topic": messages_by_topic
                 },
-                'errors': dict(self.errors_by_type),
-                'window_size': self.window_size
+                "errors": dict(self.errors_by_type),
+                "window_size": self.window_size
             }
-    
+
     def get_uptime(self) -> float:
         """Get the uptime of the MQTT connection
         
@@ -183,19 +208,18 @@ class MQTTMonitor:
             return (time.time() - self.last_connection_time
                     if self.is_connected and self.last_connection_time
                     else 0)
-    
+
     def get_message_rate(self) -> float:
         """Get the rate of incoming messages (messages per second)"""
         with self._lock:
             total_messages = len(self.message_timestamps)
-            
             if total_messages < 2:
                 return 0
             
-            time_span = (self.message_timestamps[-1] - 
+            time_span = (self.message_timestamps[-1] -
                          self.message_timestamps[0])
             return total_messages / time_span if time_span > 0 else 0
-    
+
     def get_topic_stats(self) -> Dict[str, int]:
         """Get the count of messages received, grouped by topic"""
         with self._lock:
@@ -205,10 +229,10 @@ class MQTTMonitor:
     def get_status(self):
         """Get current monitoring status"""
         return {
-            'connection': self.connection_status,
-            'messages': self.message_count,
-            'errors': self.error_count,
-            'last_error': self.last_error
+            "connection": self.connection_status,
+            "messages": self.message_count,
+            "errors": self.error_count,
+            "last_error": self.last_error
         }
 
     def update_thresholds(self, new_thresholds):
@@ -218,20 +242,60 @@ class MQTTMonitor:
                 self.thresholds[sensor_type].update(values)
         logger.info("Thresholds updated")
 
+    def reconnect(self) -> None:
+        """Force MQTT client reconnection
+        
+        This attempts to disconnect the current client (if connected)
+        and establish a new connection.
+        """
+        from app.services.mqtt_client import mqtt_client, setup_mqtt_client
+        
+        try:
+            # Only continue if we have an existing client
+            if mqtt_client is None:
+                logger.warning("Cannot reconnect - no MQTT client instance exists")
+                try:
+                    setup_mqtt_client()
+                    logger.info("Created new MQTT client instance")
+                    return True
+                except Exception as setup_error:
+                    logger.error(f"Failed to setup new MQTT client: {setup_error}")
+                    return False
+                
+            # If connected, disconnect first
+            if hasattr(mqtt_client, 'connected') and mqtt_client.connected:
+                try:
+                    mqtt_client.client.disconnect()
+                except Exception as e:
+                    logger.error(f"Error disconnecting MQTT client: {e}")
+            
+            # Re-setup the client connection
+            if hasattr(mqtt_client, '_setup_client'):
+                mqtt_client._setup_client()
+                logger.info("MQTT client reconnection initiated")
+                return True
+            else:
+                logger.error("MQTT client does not have _setup_client method")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to reconnect MQTT client: {e}")
+            self.on_error('reconnect_failed')
+            raise Exception(f"Failed to reconnect MQTT client: {e}")
+
 # Global monitor instance
 mqtt_monitor = MQTTMonitor()
 
 def get_mqtt_stats():
     """Get MQTT connection and message statistics"""
     return {
-        'connection': {
-            'is_connected': mqtt_monitor.is_connected,
-            'uptime': mqtt_monitor.get_uptime()
+        "connection": {
+            "is_connected": mqtt_monitor.is_connected,
+            "uptime": mqtt_monitor.get_uptime()
         },
-        'messages': {
-            'total': len(mqtt_monitor.message_timestamps),
-            'rate': mqtt_monitor.get_message_rate(),
-            'by_topic': mqtt_monitor.get_topic_stats()
+        "messages": {
+            "total": len(mqtt_monitor.message_timestamps),
+            "rate": mqtt_monitor.get_message_rate(),
+            "by_topic": mqtt_monitor.get_topic_stats()
         }
     }
 
@@ -241,24 +305,24 @@ def get_storage_stats():
     total_files = 0
     
     # Calculate image storage
-    for root, _, files in os.walk('data/images'):
+    for root, _, files in os.walk("data/images"):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+            if file.lower().endswith((".png", ".jpg", ".jpeg")):
                 file_path = os.path.join(root, file)
                 total_size += os.path.getsize(file_path)
                 total_files += 1
-
+    
     # Get database size
-    db_path = 'app/greenhouse.db'
+    db_path = "app/greenhouse.db"
     db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-
+    
     return {
-        'images': {
-            'total_files': total_files,
-            'total_size_mb': round(total_size / (1024 * 1024), 2)
+        "images": {
+            "total_files": total_files,
+            "total_size_mb": round(total_size / (1024 * 1024), 2)
         },
-        'database': {
-            'total_size_mb': round(db_size / (1024 * 1024), 2)
+        "database": {
+            "total_size_mb": round(db_size / (1024 * 1024), 2)
         },
-        'total_size_mb': round((total_size + db_size) / (1024 * 1024), 2)
+        "total_size_mb": round((total_size + db_size) / (1024 * 1024), 2)
     }

@@ -43,10 +43,29 @@ def save_sensor_data(data):
     try:
         # Validate required fields
         if not all(key in data for key in ['device_id', 'sensor_type', 'value']):
-            raise ValueError("Missing required sensor data fields")
-            
-        if not isinstance(data['value'], (int, float)):
-            raise ValueError("Sensor value must be numeric")
+            raise ValueError("Missing required sensor data fields")        # Validate value type - allow strings for cover position
+        sensor_type = data['sensor_type']
+        if sensor_type.endswith('_status') and 'cover' in sensor_type:
+            # For cover status, convert string positions to numeric values
+            if isinstance(data['value'], str):
+                status_upper = data['value'].upper()
+                if status_upper == 'CLOSED':
+                    data['value'] = 0
+                elif status_upper == 'HALF':
+                    data['value'] = 0.5
+                elif status_upper == 'OPEN':
+                    data['value'] = 1
+                else:
+                    raise ValueError(f"Invalid cover position: {data['value']}")
+            elif not isinstance(data['value'], (int, float)):
+                raise ValueError("Cover status must be a valid position string or numeric value")
+        else:
+            # For other sensors, only allow numeric/boolean values
+            if not isinstance(data['value'], (int, float, bool)):
+                raise ValueError("Sensor value must be numeric or boolean")
+              # Convert boolean to int if necessary
+        if isinstance(data['value'], bool):
+            data['value'] = 1 if data['value'] else 0
         
         timestamp = datetime.fromisoformat(data['timestamp']) if 'timestamp' in data else datetime.utcnow()
             
@@ -54,6 +73,8 @@ def save_sensor_data(data):
             conn.execute(text("""
                 INSERT INTO sensor_data (time, device_id, sensor_type, value)
                 VALUES (:timestamp, :device_id, :sensor_type, :value)
+                ON CONFLICT (time, device_id, sensor_type) 
+                DO UPDATE SET value = EXCLUDED.value
             """), {
                 'timestamp': timestamp,
                 'device_id': data['device_id'],
@@ -170,3 +191,106 @@ def get_latest_sensor_values(device_id=None):
     except Exception as e:
         logger.error(f"Failed to get latest sensor values: {e}")
         raise SensorError(f"Failed to get latest sensor values: {e}")
+
+@cache(ttl=30)  # Cache for 30 seconds
+def get_latest_sensor_values():
+    """Get latest sensor values for dashboard"""
+    try:
+        with engine.begin() as conn:
+            # Get latest sensor values
+            result = conn.execute(text("""
+                SELECT DISTINCT ON (sensor_type)
+                    sensor_type,
+                    device_id,
+                    value,
+                    time
+                FROM sensor_data
+                WHERE sensor_type IN ('temperature', 'humidity', 'soil_moisture', 'light')
+                ORDER BY sensor_type, time DESC
+            """))
+            
+            sensors = {}
+            for row in result:
+                sensors[row.sensor_type] = {
+                    'device_id': row.device_id,
+                    'value': row.value,
+                    'timestamp': row.time.isoformat(),
+                    'unit': get_sensor_unit(row.sensor_type)
+                }
+            
+            return sensors
+    except Exception as e:
+        logger.error(f"Failed to get latest sensor values: {e}")
+        return {}
+
+@cache(ttl=30)  # Cache for 30 seconds  
+def get_device_states():
+    """Get current states of all devices"""
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text("""
+                SELECT id, type, name, status, last_updated
+                FROM device_states
+                ORDER BY type, id
+            """))
+            
+            devices = []
+            for row in result:
+                devices.append({
+                    'id': row.id,
+                    'type': row.type,
+                    'name': row.name,
+                    'status': row.status,
+                    'last_updated': row.last_updated.isoformat() if row.last_updated else None
+                })
+            
+            return devices
+    except Exception as e:
+        logger.error(f"Failed to get device states: {e}")
+        raise SensorError(f"Failed to get device states: {e}")
+
+def update_device_state(device_id, device_type, status):
+    """Update device state in database"""
+    try:
+        with engine.begin() as conn:
+            # Get device name mapping
+            device_names = {
+                'pump': 'Bom nuoc',
+                'fan': 'Quat thong gio',
+                'cover': 'Mai che'
+            }
+            
+            device_name = device_names.get(device_type, device_id)
+            
+            # Convert status to string for database storage
+            status_str = str(status).lower() if isinstance(status, bool) else str(status)
+            
+            conn.execute(text("""
+                INSERT INTO device_states (id, type, name, status, last_updated)
+                VALUES (:device_id, :device_type, :name, :status, NOW())
+                ON CONFLICT (id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    last_updated = EXCLUDED.last_updated
+            """), {
+                'device_id': device_id,
+                'device_type': device_type,
+                'name': device_name,
+                'status': status_str
+            })
+            
+            logger.info(f"Updated device state: {device_id} ({device_type}) = {status}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Failed to update device state: {e}")
+        return False
+
+def get_sensor_unit(sensor_type):
+    """Get unit for sensor type"""
+    units = {
+        'temperature': '°C',
+        'humidity': '%',
+        'soil_moisture': '%',
+        'light': 'lux'
+    }
+    return units.get(sensor_type, '')

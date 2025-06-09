@@ -27,23 +27,18 @@ def create_app(config_class=Config):
     with app.app_context():
         # Create database tables
         db.create_all()
-        
-        # Register error handlers
-        register_error_handlers(app)
-        
-        # Initialize MQTT client
-        from app.services.mqtt_client import setup_mqtt_client
-        try:
-            mqtt_client = setup_mqtt_client()
-            app.logger.info("MQTT client initialized successfully")
-        except Exception as e:
-            app.logger.error(f"Failed to initialize MQTT client: {e}")
-        
+          # Register error handlers
+        register_error_handlers(app)        # Initialize MQTT client on-demand (to prevent startup hanging)
+        # MQTT will be initialized when first requested
+        app.logger.info("MQTT client will be initialized on first use")
+            
         # Register blueprints
-        from app.api import sensors, images, monitoring
+        from app.api import sensors, images, monitoring, control, devices
         app.register_blueprint(sensors.bp)
         app.register_blueprint(images.bp)
         app.register_blueprint(monitoring.bp)
+        app.register_blueprint(control.router)
+        app.register_blueprint(devices.bp)
         
         @app.route('/health')
         def health_check():

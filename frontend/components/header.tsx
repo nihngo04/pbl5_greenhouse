@@ -78,7 +78,7 @@ export function Header() {
               <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-green-400 to-green-600 text-white">
                 <UserCircle className="h-6 w-6" />
               </div>
-              <span className="hidden md:inline-block">Nguyễn Văn A</span>
+              <span className="hidden md:inline-block">Ngô Xuân Ninh</span>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

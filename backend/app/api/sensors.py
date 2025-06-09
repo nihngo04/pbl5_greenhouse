@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 from app.config import Config
+from app.services.mqtt_client import get_mqtt_client
 import logging
 
 bp = Blueprint('sensors', __name__)
@@ -18,13 +19,27 @@ def get_device_status():
                 FROM device_states 
                 ORDER BY type, id;
             """))
-            devices = [{
-                'id': row.id,
-                'type': row.type,
-                'name': row.name,
-                'status': row.status,
-                'last_updated': row.last_updated.isoformat()
-            } for row in result]
+            devices = []
+            for row in result:
+                # Convert status based on device type
+                status = row.status
+                if row.type in ['fan', 'pump']:
+                    # Convert string to boolean for fan and pump
+                    status = status.lower() == 'true' if isinstance(status, str) else bool(status)
+                # For cover, keep string value (OPEN, HALF, CLOSED)
+                
+                devices.append({
+                    'id': row.id,
+                    'type': row.type,
+                    'name': row.name,
+                    'status': status,
+                    'last_updated': row.last_updated.isoformat()
+                })              # Use safe encoding for Unicode device names in debug logs
+            try:
+                safe_log_msg = f"Returning {len(devices)} device statuses"
+                logger.debug(safe_log_msg)
+            except Exception as e:
+                logger.debug("Returning device statuses (logging error avoided)")
             
             return jsonify({
                 'success': True,
@@ -34,56 +49,7 @@ def get_device_status():
         logger.error(f"Error getting device status: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
-        }), 500
-
-@bp.route('/api/devices/<device_id>/control', methods=['POST'])
-def control_device(device_id):
-    """API endpoint để điều khiển thiết bị"""
-    try:
-        data = request.get_json()
-        if 'status' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing status in request body'
-            }), 400
-
-        with engine.connect() as conn:
-            # Update device status
-            result = conn.execute(
-                text("""
-                    UPDATE device_states 
-                    SET status = :status, last_updated = CURRENT_TIMESTAMP 
-                    WHERE id = :device_id
-                    RETURNING id, type, name, status, last_updated;
-                """),
-                {'device_id': device_id, 'status': data['status']}
-            )
-            conn.commit()
-            
-            device = result.fetchone()
-            if not device:
-                return jsonify({
-                    'success': False,
-                    'error': 'Device not found'
-                }), 404
-
-            return jsonify({
-                'success': True,
-                'data': {
-                    'id': device.id,
-                    'type': device.type,
-                    'name': device.name,
-                    'status': device.status,
-                    'last_updated': device.last_updated.isoformat()
-                }
-            })
-    except Exception as e:
-        logger.error(f"Error controlling device {device_id}: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+            'error': str(e)        }), 500
 
 @bp.route('/api/alerts', methods=['GET'])
 def get_alerts():
@@ -268,7 +234,7 @@ def save_sensor():
                 'error': 'Thiếu thông tin cần thiết trong request body'
             }), 400
 
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             # Insert sensor data
             result = conn.execute(
                 text("""
@@ -278,7 +244,6 @@ def save_sensor():
                 """),
                 {'device_id': data['device_id'], 'sensor_type': data['sensor_type'], 'value': data['value']}
             )
-            conn.commit()
             
             sensor_data = result.fetchone()
             if not sensor_data:

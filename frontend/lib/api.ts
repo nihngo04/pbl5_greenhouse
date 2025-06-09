@@ -24,7 +24,7 @@ export interface DeviceState {
   id: string;
   type: string;
   name: string;
-  status: boolean;
+  status: boolean | string;
   last_updated: string;
 }
 
@@ -46,6 +46,30 @@ export interface VisualizationData {
 }
 
 export type TimeRange = 'day' | 'week' | 'month' | 'year';
+
+export interface DashboardData {
+  sensors: {
+    [key: string]: {
+      device_id: string;
+      value: number;
+      timestamp: string;
+      unit: string;
+    };
+  };
+  devices: DeviceState[];
+  system: {
+    mqtt: any;
+    storage: any;
+    last_updated: string;
+  };
+}
+
+export interface SensorHistoryData {
+  time: string;
+  device_id: string;
+  sensor_type: string;
+  value: number;
+}
 
 export const greenhouseAPI = {
   async getSensorData(): Promise<SensorData> {
@@ -82,12 +106,25 @@ export const greenhouseAPI = {
     const response = await api.get<APIResponse<DeviceState[]>>('/api/devices/status');
     return response.data.data;
   },
-
   async updateDeviceState(deviceId: string, status: boolean): Promise<DeviceState> {
     const response = await api.post<APIResponse<DeviceState>>(`/api/devices/${deviceId}/control`, { status });
     return response.data.data;
   },
+  
+  async controlDevice(deviceId: string, deviceType: string, status: boolean | string): Promise<any> {
+    const response = await api.post<APIResponse<any>>(`/api/devices/${deviceId}/control`, {
+      device_type: deviceType,
+      command: 'SET_STATE',
+      status: status
+    });
+    return response.data;
+  },
 
+  async scheduleDevice(deviceId: string, duration: number): Promise<any> {
+    const response = await api.post<APIResponse<any>>(`/api/devices/${deviceId}/schedule`, { duration });
+    return response.data;
+  },
+  
   async getAlerts(): Promise<Alert[]> {
     const response = await api.get<APIResponse<Alert[]>>('/api/alerts');
     return response.data.data;
@@ -95,6 +132,31 @@ export const greenhouseAPI = {
 
   async getVisualizationData(range: TimeRange) {
     const response = await api.get<APIResponse<VisualizationData>>(`/api/sensors/visualization?range=${range}`);
+    return response.data.data;
+  },
+
+  async getDashboardData(): Promise<DashboardData> {
+    const response = await api.get<APIResponse<DashboardData>>('/api/dashboard');
+    return response.data.data;
+  },
+
+  async getDashboardOverview(): Promise<DashboardData> {
+    const response = await api.get<APIResponse<DashboardData>>('/api/dashboard/overview');
+    return response.data.data;
+  },
+
+  async getSensorHistory(sensorType?: string, deviceId?: string, hours: number = 24): Promise<SensorHistoryData[]> {
+    const params = new URLSearchParams();
+    if (sensorType) params.append('sensor_type', sensorType);
+    if (deviceId) params.append('device_id', deviceId);
+    params.append('hours', hours.toString());
+    
+    const response = await api.get<APIResponse<SensorHistoryData[]>>(`/api/dashboard/sensor-history?${params}`);
+    return response.data.data;
+  },
+
+  async getDeviceStatus(): Promise<DeviceState[]> {
+    const response = await api.get<APIResponse<DeviceState[]>>('/api/dashboard/device-status');
     return response.data.data;
   }
 };

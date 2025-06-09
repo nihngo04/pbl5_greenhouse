@@ -1,186 +1,310 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, ImageIcon, Check, AlertTriangle } from "lucide-react"
+import { Camera, Eye, Check, AlertTriangle, Leaf, Bug, Shield, Clock, TrendingUp } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 
 export default function DiseaseDetection() {
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [result, setResult] = useState<any | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<any | null>(null)
+  const [scanProgress, setScanProgress] = useState(0)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPreview(reader.result as string)
-      }
-      reader.readAsDataURL(selectedFile)
-      setResult(null)
+  const startDetection = () => {
+    setIsScanning(true)
+    setScanProgress(0)
+    setScanResult(null)
+
+    // Simulate scanning progress
+    const interval = setInterval(() => {
+      setScanProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          setIsScanning(false)
+          // Mock result after scanning
+          setScanResult({
+            detectedIssues: [
+              {
+                type: "disease",
+                name: "Bệnh đốm lá",
+                severity: "medium",
+                confidence: 92.5,
+                location: "Lá tầng dưới",
+                description: "Phát hiện các đốm nâu trên lá, có thể do nấm gây ra",
+              },
+              {
+                type: "pest",
+                name: "Rệp xanh",
+                severity: "low",
+                confidence: 78.3,
+                location: "Mặt dưới lá",
+                description: "Phát hiện một số côn trùng nhỏ màu xanh",
+              },
+            ],
+            recommendations: [
+              "Loại bỏ và tiêu hủy lá bị nhiễm bệnh",
+              "Sử dụng thuốc diệt nấm có chứa đồng",
+              "Tăng cường thông gió trong nhà kính",
+              "Kiểm tra và điều chỉnh độ ẩm",
+            ],
+          })
+          return 100
+        }
+        return prev + 2
+      })
+    }, 100)
+  }
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case "high":
+        return "bg-red-100 text-red-700 border-red-200"
+      case "medium":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200"
+      case "low":
+        return "bg-green-100 text-green-700 border-green-200"
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200"
     }
   }
 
-  const analyzeImage = () => {
-    if (!file) return
-
-    // Simulate API call
-    setTimeout(() => {
-      // Mock result
-      setResult({
-        disease: "Bệnh đốm lá (Leaf Spot)",
-        confidence: 92.5,
-        description:
-          "Bệnh đốm lá là một bệnh phổ biến trên nhiều loại cây trồng, gây ra bởi các loại nấm khác nhau. Bệnh thường xuất hiện dưới dạng các đốm tròn hoặc bất thường trên lá, có màu nâu, đen hoặc xám.",
-        treatment: [
-          "Loại bỏ và tiêu hủy lá bị nhiễm bệnh",
-          "Sử dụng thuốc diệt nấm có chứa đồng hoặc chlorothalonil",
-          "Tăng cường thông gió trong nhà kính",
-          "Tránh tưới nước trên lá",
-          "Duy trì khoảng cách hợp lý giữa các cây",
-        ],
-        prevention: [
-          "Sử dụng giống kháng bệnh",
-          "Luân canh cây trồng",
-          "Kiểm soát độ ẩm trong nhà kính",
-          "Áp dụng chế độ tưới nước hợp lý",
-        ],
-      })
-    }, 2000)
+  const getSeverityIcon = (type: string) => {
+    switch (type) {
+      case "disease":
+        return <Leaf className="h-4 w-4" />
+      case "pest":
+        return <Bug className="h-4 w-4" />
+      default:
+        return <AlertTriangle className="h-4 w-4" />
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Nhận Diện Sâu Bệnh</h1>
-        <p className="text-gray-500">Sử dụng AI để phân tích và nhận diện các loại sâu bệnh trên cây trồng</p>
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-green-600 mb-2">Nhận Diện Sâu Bệnh AI</h1>
+        <p className="text-gray-600">Hệ thống AI tự động phân tích và phát hiện sâu bệnh trên cây trồng</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tải ảnh lên</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div
-                className="flex h-64 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 p-4 transition-colors hover:border-green-500"
-                onClick={() => document.getElementById("file-upload")?.click()}
-              >
-                {preview ? (
-                  <div className="relative h-full w-full">
-                    <Image src={preview || "/placeholder.svg"} alt="Preview" fill className="object-contain" />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-gray-500">
-                    <Upload className="mb-2 h-10 w-10" />
-                    <p className="mb-1 text-sm font-medium">Kéo thả ảnh hoặc nhấp để tải lên</p>
-                    <p className="text-xs">PNG, JPG hoặc JPEG (tối đa 5MB)</p>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main Detection Panel */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Quét nhận diện tự động
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-green-300 rounded-lg bg-green-50">
+                  {!isScanning && !scanResult && (
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                        <Eye className="h-8 w-8 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-green-800 mb-2">Sẵn sàng quét nhận diện</h3>
+                        <p className="text-sm text-green-600 mb-4">
+                          Hệ thống AI sẽ tự động phân tích hình ảnh từ camera trong nhà kính
+                        </p>
+                        <Button onClick={startDetection} className="bg-green-600 hover:bg-green-700">
+                          <Camera className="mr-2 h-4 w-4" />
+                          Nhận diện sâu bệnh
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isScanning && (
+                    <div className="text-center space-y-4 w-full max-w-md">
+                      <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-green-800 mb-2">Đang quét và phân tích...</h3>
+                        <p className="text-sm text-green-600 mb-4">
+                          AI đang xử lý hình ảnh từ {Math.floor(scanProgress / 20) + 1}/5 camera
+                        </p>
+                        <Progress value={scanProgress} className="w-full" />
+                        <p className="text-xs text-green-500 mt-2">{scanProgress.toFixed(0)}% hoàn thành</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {scanResult && (
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                        <Check className="h-8 w-8 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-green-800 mb-2">Quét hoàn thành</h3>
+                        <p className="text-sm text-green-600">Đã phân tích 5 khu vực trong nhà kính</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {scanResult && (
+                  <div className="text-center">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-3xl font-bold text-orange-600 mb-2">
+                          {scanResult.detectedIssues.length}
+                        </div>
+                        <p className="text-sm text-gray-600">Vấn đề phát hiện</p>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept="image/png, image/jpeg, image/jpg"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
               </div>
+            </CardContent>
+          </Card>
 
-              <Button className="w-full" disabled={!file || !!result} onClick={analyzeImage}>
-                {result ? "Đang phân tích..." : "Phân tích ảnh"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Kết quả phân tích</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!result ? (
-              <div className="flex h-64 flex-col items-center justify-center text-gray-500">
-                <ImageIcon className="mb-2 h-10 w-10" />
-                <p className="text-sm">Tải ảnh lên và nhấn "Phân tích ảnh" để xem kết quả</p>
-              </div>
-            ) : !result ? (
-              <div className="flex h-64 flex-col items-center justify-center text-gray-500">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-500 border-t-transparent"></div>
-                <p className="mt-2 text-sm">Đang phân tích ảnh...</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-md bg-green-50 p-3 text-green-700">
-                  <div className="flex items-center gap-2">
-                    <Check className="h-5 w-5" />
-                    <span className="font-medium">{result.disease}</span>
-                  </div>
-                  <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium">
-                    {result.confidence}% chính xác
-                  </span>
-                </div>
-
-                <Tabs defaultValue="description">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="description">Mô tả</TabsTrigger>
-                    <TabsTrigger value="treatment">Cách xử lý</TabsTrigger>
-                    <TabsTrigger value="prevention">Phòng ngừa</TabsTrigger>
+          {/* Detection Results */}
+          {scanResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Kết quả phân tích chi tiết</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="issues">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="issues">Vấn đề phát hiện</TabsTrigger>
+                    <TabsTrigger value="recommendations">Khuyến nghị</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="description" className="mt-4">
-                    <p className="text-sm text-gray-700">{result.description}</p>
-                  </TabsContent>
-                  <TabsContent value="treatment" className="mt-4">
-                    <ul className="space-y-2 text-sm text-gray-700">
-                      {result.treatment.map((item: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <Check className="mt-0.5 h-4 w-4 text-green-500" />
-                          <span>{item}</span>
-                        </li>
+                  <TabsContent value="issues" className="mt-4">
+                    <div className="space-y-4">
+                      {scanResult.detectedIssues.map((issue: any, index: number) => (
+                        <div key={index} className={`p-4 rounded-lg border ${getSeverityColor(issue.severity)}`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {getSeverityIcon(issue.type)}
+                              <h4 className="font-medium">{issue.name}</h4>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {issue.confidence}% chính xác
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-2">{issue.description}</p>
+                          <div className="flex items-center gap-4 text-xs">
+                            <span>
+                              <strong>Vị trí:</strong> {issue.location}
+                            </span>
+                            <span>
+                              <strong>Mức độ:</strong>{" "}
+                              {issue.severity === "high" ? "Cao" : issue.severity === "medium" ? "Trung bình" : "Thấp"}
+                            </span>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </TabsContent>
-                  <TabsContent value="prevention" className="mt-4">
-                    <ul className="space-y-2 text-sm text-gray-700">
-                      {result.prevention.map((item: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 text-yellow-500" />
-                          <span>{item}</span>
-                        </li>
+                  <TabsContent value="recommendations" className="mt-4">
+                    <div className="space-y-3">
+                      {scanResult.recommendations.map((rec: string, index: number) => (
+                        <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                          <Shield className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-sm text-blue-800">{rec}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </TabsContent>
                 </Tabs>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lịch sử phân tích</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="overflow-hidden rounded-md border">
-                <div className="relative aspect-square bg-gray-100">
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-xs text-white">
-                    {i % 2 === 0 ? "Bệnh đốm lá" : "Bệnh thối rễ"}
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Quick Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Thống kê hôm nay
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Lần quét:</span>
+                <span className="font-medium">3</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Vấn đề mới:</span>
+                <span className="font-medium text-orange-600">2</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Hoạt động gần đây
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { time: "10:30", action: "Phát hiện bệnh đốm lá", type: "warning" },
+                { time: "09:15", action: "Quét tự động hoàn thành", type: "success" },
+                { time: "08:45", action: "Xử lý rệp xanh thành công", type: "success" },
+                { time: "07:20", action: "Bắt đầu quét nhận diện", type: "info" },
+              ].map((activity, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <div
+                    className={`w-2 h-2 rounded-full mt-2 ${
+                      activity.type === "success"
+                        ? "bg-green-500"
+                        : activity.type === "warning"
+                          ? "bg-yellow-500"
+                          : activity.type === "info"
+                            ? "bg-blue-500"
+                            : "bg-red-500"
+                    }`}
+                  ></div>
+                  <div className="flex-1">
+                    <p className="text-sm">{activity.action}</p>
+                    <p className="text-xs text-gray-500">{activity.time}</p>
                   </div>
                 </div>
-                <div className="p-2 text-xs">
-                  <div className="font-medium">
-                    {new Date(Date.now() - i * 24 * 60 * 60 * 1000).toLocaleDateString()}
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Historical Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lịch sử phát hiện</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              { date: "Hôm nay", issues: 2, trend: "down" },
+              { date: "Hôm qua", issues: 1, trend: "up" },
+              { date: "2 ngày trước", issues: 3, trend: "down" },
+              { date: "3 ngày trước", issues: 0, trend: "up" },
+            ].map((day, index) => (
+              <div key={index} className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">{day.date}</span>
+                  <TrendingUp
+                    className={`h-4 w-4 ${day.trend === "up" ? "text-green-500" : "text-red-500"} ${day.trend === "down" ? "rotate-180" : ""}`}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Vấn đề:</span>
+                    <span className={day.issues > 0 ? "text-orange-600" : "text-green-600"}>{day.issues}</span>
                   </div>
-                  <div className="text-gray-500">{i % 2 === 0 ? "Cà chua" : "Dưa chuột"}</div>
                 </div>
               </div>
             ))}

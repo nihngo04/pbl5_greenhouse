@@ -1,4 +1,4 @@
-from app.services.mqtt_client import setup_mqtt_client
+# Import services - avoid circular imports
 from app.services.timescale import (
     save_sensor_data,
     query_sensor_data,
@@ -12,7 +12,6 @@ from app.services.image_service import (
 )
 
 __all__ = [
-    'setup_mqtt_client',
     'save_sensor_data',
     'query_sensor_data',
     'get_latest_sensor_values',

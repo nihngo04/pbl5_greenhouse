@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Edit, Trash2, Thermometer, Droplets, Sprout, Sun, Fan, Droplet, Umbrella, Plus, Check } from "lucide-react"
+import { Edit, Fan, Droplet, Umbrella, HelpCircle, Check, Plus, Copy, Trash2, AlertTriangle } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { toast } from "@/hooks/use-toast"
+import { greenhouseAPI } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -15,8 +20,105 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
+
+// Type definitions
+type Schedule = {
+  time?: string
+  duration?: number
+  start?: string
+  end?: string
+  position?: 'closed' | 'half-open' | 'open'
+}
+
+interface PumpSchedule {
+  time: string
+  duration: number
+}
+
+interface CoverSchedule {
+  start: string
+  end: string
+  position: 'closed' | 'half-open' | 'open'
+}
+
+interface CheckInterval {
+  start: string
+  end: string
+  interval: number
+}
+
+interface DeviceState {
+  pump: {
+    soilMoistureThreshold: number
+    schedules: PumpSchedule[]
+    checkIntervals: CheckInterval[]
+  }
+  fan: {
+    tempThreshold: number
+    humidityThreshold: number
+    duration: number
+    checkInterval: number
+  }
+  cover: {
+    tempThreshold: number
+    schedules: CoverSchedule[]
+  }
+  name: string
+}
+
+interface AlertState {
+  temperature: {
+    warning: number
+    danger: number
+    enabled: boolean
+  }
+  humidity: {
+    warning: number
+    danger: number
+    enabled: boolean
+  }
+  soilMoisture: {
+    warning: number
+    danger: number
+    enabled: boolean
+  }
+  light: {
+    warning: number
+    danger: number
+    enabled: boolean
+  }
+}
+
+interface PumpConfig {
+  soilMoistureThreshold: number
+  schedules: PumpSchedule[]
+  checkIntervals: CheckInterval[]
+}
+
+interface FanConfig {
+  tempThreshold: number
+  humidityThreshold: number
+  duration: number
+  checkInterval: number
+}
+
+interface CoverConfig {
+  tempThreshold: number
+  schedules: CoverSchedule[]
+}
+
+interface DeviceConfig {
+  name: string
+  pump: PumpConfig
+  fan: FanConfig
+  cover: CoverConfig
+}
+
+interface ConfigMap {
+  [key: string]: DeviceConfig
+}
 
 export default function Management() {
   const initialGreenhouses = [
@@ -29,109 +131,234 @@ export default function Management() {
   ]
   const [greenhouses, setGreenhouses] = useState(initialGreenhouses)
 
-  // Danh sách các thiết bị có sẵn
-  const availableDevices = [
-    { id: 1, name: "Quạt thông gió", type: "fan", icon: Fan },
-    { id: 2, name: "Bơm nước", type: "pump", icon: Droplet },
-    { id: 3, name: "Mái che", type: "cover", icon: Umbrella },
-  ]
+  // Cấu hình mặc định
+  const defaultConfigs: ConfigMap = {
+    "cay-non": {
+      name: "Giai đoạn cây non",
+      pump: {
+        soilMoistureThreshold: 60,
+        schedules: [
+          { time: "05:00", duration: 5 },
+          { time: "17:00", duration: 5 },
+        ],
+        checkIntervals: [
+          { start: "06:00", end: "10:00", interval: 2 },
+          { start: "14:00", end: "17:00", interval: 2 },
+        ],
+      },
+      fan: {
+        tempThreshold: 28,
+        humidityThreshold: 85,
+        duration: 15,
+        checkInterval: 30,
+      },
+      cover: {
+        tempThreshold: 30,
+        schedules: [
+          { start: "10:00", end: "14:00", position: "closed" },
+          { start: "06:00", end: "10:00", position: "open" },
+          { start: "14:00", end: "18:00", position: "open" },
+          { start: "18:00", end: "06:00", position: "open" },
+        ],
+      },
+    },
+    "cay-truong-thanh": {
+      name: "Giai đoạn cây trưởng thành",
+      pump: {
+        soilMoistureThreshold: 60,
+        schedules: [{ time: "05:00", duration: 10 }],
+        checkIntervals: [
+          { start: "06:00", end: "10:00", interval: 2 },
+          { start: "14:00", end: "17:00", interval: 2 },
+        ],
+      },
+      fan: {
+        tempThreshold: 28,
+        humidityThreshold: 85,
+        duration: 15,
+        checkInterval: 30,
+      },
+      cover: {
+        tempThreshold: 30,
+        schedules: [
+          { start: "10:00", end: "14:00", position: "closed" },
+          { start: "06:00", end: "10:00", position: "open" },
+          { start: "14:00", end: "18:00", position: "open" },
+          { start: "18:00", end: "06:00", position: "open" },
+        ],
+      },
+    },
+  }
 
-  // Cấu trúc dữ liệu mới cho ngưỡng điều khiển
-  const [thresholds, setThresholds] = useState({
+  const [configs, setConfigs] = useState<Record<string, DeviceState>>(defaultConfigs)
+  const [selectedConfig, setSelectedConfig] = useState<string>("cay-non")
+  const [currentConfig, setCurrentConfig] = useState<DeviceState>(defaultConfigs["cay-non"])
+  const [newConfigName, setNewConfigName] = useState<string>("")
+  const [showNewConfigDialog, setShowNewConfigDialog] = useState<boolean>(false)
+
+  // Cấu hình cảnh báo
+  const [alertConfig, setAlertConfig] = useState<AlertState>({
     temperature: {
-      min: 20,
-      max: 30,
-      devices: [{ deviceId: 1, name: "Quạt thông gió", onValue: 28, offValue: 25, active: true }],
+      warning: 30,
+      danger: 35,
+      enabled: true,
     },
     humidity: {
-      min: 60,
-      max: 80,
-      devices: [
-        { deviceId: 1, name: "Quạt thông gió", onValue: 75, offValue: 70, active: true },
-      ],
+      warning: 80,
+      danger: 90,
+      enabled: true,
     },
     soilMoisture: {
-      min: 30,
-      max: 60,
-      devices: [{ deviceId: 2, name: "Bơm nước", onValue: 35, offValue: 55, active: true }],
+      warning: 20,
+      danger: 10,
+      enabled: true,
     },
     light: {
-      min: 5000,
-      max: 9000,
-      devices: [
-        { deviceId: 3, name: "Mái che", onValue: 8500, offValue: 8000, active: true },
-      ],
+      warning: 9000,
+      danger: 9500,
+      enabled: true,
     },
   })
 
-  // State cho dialog thêm thiết bị
-  const [selectedParameter, setSelectedParameter] = useState<string | null>(null)
-  const [selectedDevices, setSelectedDevices] = useState<number[]>([])
-  const [dialogOpen, setDialogOpen] = useState(false)
+  type DeviceSection = 'pump' | 'fan' | 'cover';
+  type ScheduleSection = 'pump' | 'cover';
 
-  // Xử lý thêm thiết bị mới vào tham số
-  const handleAddDevices = () => {
-    if (!selectedParameter || selectedDevices.length === 0) return
+  const handleConfigChange = (section: DeviceSection, field: string, value: number) => {
+    setCurrentConfig((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }))
+  }
 
-    const newThresholds = { ...thresholds }
-    const parameter = selectedParameter as keyof typeof thresholds
-
-    selectedDevices.forEach((deviceId) => {
-      const device = availableDevices.find((d) => d.id === deviceId)
-      if (device && !newThresholds[parameter].devices.some((d) => d.deviceId === deviceId)) {
-        newThresholds[parameter].devices.push({
-          deviceId,
-          name: device.name,
-          onValue: parameter === "light" ? 8000 : parameter === "soilMoisture" ? 35 : 70,
-          offValue: parameter === "light" ? 7000 : parameter === "soilMoisture" ? 50 : 65,
-          active: false,
-        })
+  const handleScheduleChange = (
+    section: ScheduleSection,
+    index: number,
+    field: 'time' | 'duration' | 'start' | 'end' | 'position',
+    value: string | number
+  ) => {
+    setCurrentConfig((prev) => {
+      const schedules = prev[section].schedules.map((schedule, i) =>
+        i === index ? { ...schedule, [field]: value } : schedule
+      )
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          schedules,
+        },
       }
     })
-
-    setThresholds(newThresholds)
-    setSelectedDevices([])
-    setDialogOpen(false)
   }
 
-  // Xử lý xóa thiết bị khỏi tham số
-  const handleRemoveDevice = (parameter: keyof typeof thresholds, deviceId: number) => {
-    const newThresholds = { ...thresholds }
-    newThresholds[parameter].devices = newThresholds[parameter].devices.filter((device) => device.deviceId !== deviceId)
-    setThresholds(newThresholds)
+  const handleAlertConfigChange = (parameter: string, field: string, value: any) => {
+    setAlertConfig((prev) => ({
+      ...prev,
+      [parameter]: {
+        ...prev[parameter as keyof typeof prev],
+        [field]: value,
+      },
+    }))
   }
 
-  // Xử lý thay đổi trạng thái kích hoạt của thiết bị
-  const handleToggleDeviceActive = (parameter: keyof typeof thresholds, deviceId: number) => {
-    const newThresholds = { ...thresholds }
-    const deviceIndex = newThresholds[parameter].devices.findIndex((device) => device.deviceId === deviceId)
+  const addSchedule = (section: ScheduleSection) => {
+    const newSchedule = section === "pump" 
+      ? { time: "12:00", duration: 5 } as PumpSchedule
+      : { start: "12:00", end: "13:00", position: "open" } as CoverSchedule
 
-    if (deviceIndex !== -1) {
-      newThresholds[parameter].devices[deviceIndex].active = !newThresholds[parameter].devices[deviceIndex].active
-      setThresholds(newThresholds)
+    setCurrentConfig((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        schedules: [...prev[section].schedules, newSchedule],
+      },
+    }))
+  }
+
+  const removeSchedule = (section: ScheduleSection, index: number) => {
+    setCurrentConfig((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        schedules: prev[section].schedules.filter((_, i) => i !== index),
+      },
+    }))
+  }
+
+  const handleSaveConfig = () => {
+    setConfigs((prev) => ({
+      ...prev,
+      [selectedConfig]: currentConfig,
+    }))
+
+    toast({
+      title: "Cài đặt đã được lưu thành công!",
+      description: `Cấu hình "${currentConfig.name}" đã được cập nhật`,
+    })
+  }
+
+  const handleSaveAlertConfig = () => {
+    toast({
+      title: "Cài đặt cảnh báo đã được lưu!",
+      description: "Các ngưỡng cảnh báo đã được cập nhật",
+    })
+  }
+
+  const handleCreateNewConfig = () => {
+    if (!newConfigName.trim()) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng nhập tên cấu hình",
+        variant: "destructive",
+      })
+      return
     }
-  }
 
-  // Xử lý thay đổi giá trị ngưỡng của thiết bị
-  const handleDeviceThresholdChange = (
-    parameter: keyof typeof thresholds,
-    deviceId: number,
-    field: "onValue" | "offValue",
-    value: number,
-  ) => {
-    const newThresholds = { ...thresholds }
-    const deviceIndex = newThresholds[parameter].devices.findIndex((device) => device.deviceId === deviceId)
-
-    if (deviceIndex !== -1) {
-      newThresholds[parameter].devices[deviceIndex][field] = value
-      setThresholds(newThresholds)
+    const newConfigKey = newConfigName.toLowerCase().replace(/\s+/g, "-")
+    const newConfig = {
+      ...currentConfig,
+      name: newConfigName,
     }
+
+    setConfigs((prev) => ({
+      ...prev,
+      [newConfigKey]: newConfig,
+    }))
+
+    setSelectedConfig(newConfigKey)
+    setCurrentConfig(newConfig)
+    setNewConfigName("")
+    setShowNewConfigDialog(false)
+
+    toast({
+      title: "Tạo cấu hình thành công!",
+      description: `Cấu hình "${newConfigName}" đã được tạo`,
+    })
   }
 
-  // Lấy icon cho thiết bị
-  const getDeviceIcon = (deviceId: number) => {
-    const device = availableDevices.find((d) => d.id === deviceId)
-    return device ? device.icon : Fan
+  const handleSelectConfig = (configKey: string) => {
+    setSelectedConfig(configKey)
+    setCurrentConfig(configs[configKey as keyof typeof configs])
+  }
+
+  const duplicateConfig = () => {
+    setNewConfigName(`${currentConfig.name} - Copy`)
+    setShowNewConfigDialog(true)
+  }
+
+  const getPositionLabel = (position: string) => {
+    switch (position) {
+      case "closed":
+        return "Đóng (60°)"
+      case "half-open":
+        return "Mở vừa (45°)"
+      case "open":
+        return "Mở (90°)"
+      default:
+        return "Mở (90°)"
+    }
   }
 
   return (
@@ -142,9 +369,10 @@ export default function Management() {
       </div>
 
       <Tabs defaultValue="greenhouses">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="greenhouses">Nhà kính</TabsTrigger>
-          <TabsTrigger value="thresholds">Ngưỡng điều khiển</TabsTrigger>
+          <TabsTrigger value="device-config">Cấu hình thiết bị</TabsTrigger>
+          <TabsTrigger value="alerts">Cảnh báo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="greenhouses" className="mt-6">
@@ -166,11 +394,7 @@ export default function Management() {
                   {greenhouses.map((greenhouse) => (
                     <TableRow key={greenhouse.id}>
                       <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {/* <Home className="h-4 w-4 text-green-500" /> */}
-                          Nhà kính
-                          {greenhouse.name}
-                        </div>
+                        <div className="flex items-center gap-2">Nhà kính {greenhouse.name}</div>
                       </TableCell>
                       <TableCell>{greenhouse.area}</TableCell>
                       <TableCell>{greenhouse.location}</TableCell>
@@ -216,600 +440,619 @@ export default function Management() {
           </div>
         </TabsContent>
 
-        <TabsContent value="thresholds" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Nhiệt độ */}
+        <TabsContent value="device-config" className="mt-6">
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-green-600 mb-2">Cấu hình hoạt động thiết bị</h2>
+              <p className="text-gray-600">Thiết lập ngưỡng tự động cho các thiết bị trong nhà kính</p>
+            </div>
+
+            {/* Config Selection */}
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
-                <Thermometer className="h-5 w-5 text-red-500" />
-                <CardTitle>Nhiệt độ (°C)</CardTitle>
+              <CardHeader>
+                <CardTitle>Chọn cấu hình</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="temp-min">Ngưỡng tối thiểu</Label>
-                      <Input
-                        id="temp-min"
-                        type="number"
-                        value={thresholds.temperature.min}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            temperature: {
-                              ...thresholds.temperature,
-                              min: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="temp-max">Ngưỡng tối đa</Label>
-                      <Input
-                        id="temp-max"
-                        type="number"
-                        value={thresholds.temperature.max}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            temperature: {
-                              ...thresholds.temperature,
-                              max: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
-                    </div>
+                <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex-1 min-w-[200px]">
+                    <Select value={selectedConfig} onValueChange={handleSelectConfig}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(configs).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            {config.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Thiết bị điều khiển</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedParameter("temperature")
-                          setSelectedDevices([])
-                          setDialogOpen(true)
-                        }}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Thêm thiết bị
+                  <Button variant="outline" onClick={duplicateConfig}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Sao chép
+                  </Button>
+                  <Dialog open={showNewConfigDialog} onOpenChange={setShowNewConfigDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Tạo mới
                       </Button>
-                    </div>
-
-                    <div className="space-y-3 rounded-md border p-3">
-                      {thresholds.temperature.devices.length === 0 ? (
-                        <div className="text-center text-sm text-gray-500 py-2">Chưa có thiết bị nào được thêm</div>
-                      ) : (
-                        thresholds.temperature.devices.map((device) => {
-                          const DeviceIcon = getDeviceIcon(device.deviceId)
-                          return (
-                            <div key={device.deviceId} className="rounded-md border p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <DeviceIcon className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">{device.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    checked={device.active}
-                                    onCheckedChange={() => handleToggleDeviceActive("temperature", device.deviceId)}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveDevice("temperature", device.deviceId)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Bật khi ≥</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.onValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "temperature",
-                                        device.deviceId,
-                                        "onValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Tắt khi ≤</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.offValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "temperature",
-                                        device.deviceId,
-                                        "offValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Tạo cấu hình mới</DialogTitle>
+                        <DialogDescription>
+                          Nhập tên cho cấu hình mới. Cấu hình sẽ được sao chép từ cấu hình hiện tại.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="config-name">Tên cấu hình</Label>
+                          <Input
+                            id="config-name"
+                            value={newConfigName}
+                            onChange={(e) => setNewConfigName(e.target.value)}
+                            placeholder="Nhập tên cấu hình..."
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowNewConfigDialog(false)}>
+                          Hủy
+                        </Button>
+                        <Button onClick={handleCreateNewConfig}>Tạo cấu hình</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Độ ẩm */}
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
-                <Droplets className="h-5 w-5 text-blue-500" />
-                <CardTitle>Độ ẩm (%)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="humidity-min">Ngưỡng tối thiểu</Label>
-                      <Input
-                        id="humidity-min"
-                        type="number"
-                        value={thresholds.humidity.min}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            humidity: {
-                              ...thresholds.humidity,
-                              min: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
+            {/* Device Configuration */}
+            <div className="grid gap-6">
+              {/* Pump Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+                      <Droplet className="h-6 w-6" />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="humidity-max">Ngưỡng tối đa</Label>
-                      <Input
-                        id="humidity-max"
-                        type="number"
-                        value={thresholds.humidity.max}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            humidity: {
-                              ...thresholds.humidity,
-                              max: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
+                    Bơm Tưới
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label>Ngưỡng độ ẩm đất (%)</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Bơm sẽ bật khi độ ẩm đất dưới ngưỡng này</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={currentConfig.pump.soilMoistureThreshold}
+                          onChange={(e) => handleConfigChange("pump", "soilMoistureThreshold", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[currentConfig.pump.soilMoistureThreshold]}
+                          onValueChange={(value) => handleConfigChange("pump", "soilMoistureThreshold", value[0])}
+                          min={0}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label>Thiết bị điều khiển</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedParameter("humidity")
-                          setSelectedDevices([])
-                          setDialogOpen(true)
-                        }}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Thêm thiết bị
+                      <Label className="text-lg font-medium">Lịch tưới</Label>
+                      <Button size="sm" variant="outline" onClick={() => addSchedule("pump")}>
+                        <Plus className="mr-1 h-4 w-4" />
+                        Thêm lịch
                       </Button>
                     </div>
-
-                    <div className="space-y-3 rounded-md border p-3">
-                      {thresholds.humidity.devices.length === 0 ? (
-                        <div className="text-center text-sm text-gray-500 py-2">Chưa có thiết bị nào được thêm</div>
-                      ) : (
-                        thresholds.humidity.devices.map((device) => {
-                          const DeviceIcon = getDeviceIcon(device.deviceId)
-                          return (
-                            <div key={device.deviceId} className="rounded-md border p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <DeviceIcon className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">{device.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    checked={device.active}
-                                    onCheckedChange={() => handleToggleDeviceActive("humidity", device.deviceId)}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveDevice("humidity", device.deviceId)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Bật khi ≥</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.onValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "humidity",
-                                        device.deviceId,
-                                        "onValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Tắt khi ≤</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.offValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "humidity",
-                                        device.deviceId,
-                                        "offValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Độ ẩm đất */}
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
-                <Sprout className="h-5 w-5 text-green-500" />
-                <CardTitle>Độ ẩm đất (%)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="soil-min">Ngưỡng tối thiểu</Label>
-                      <Input
-                        id="soil-min"
-                        type="number"
-                        value={thresholds.soilMoisture.min}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            soilMoisture: {
-                              ...thresholds.soilMoisture,
-                              min: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="soil-max">Ngưỡng tối đa</Label>
-                      <Input
-                        id="soil-max"
-                        type="number"
-                        value={thresholds.soilMoisture.max}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            soilMoisture: {
-                              ...thresholds.soilMoisture,
-                              max: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
+                    <div className="space-y-3">
+                      {currentConfig.pump.schedules.map((schedule: any, index: number) => (
+                        <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Thời gian:</Label>
+                            <Input
+                              type="time"
+                              value={schedule.time}
+                              onChange={(e) => handleScheduleChange("pump", index, "time", e.target.value)}
+                              className="w-32"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Thời lượng:</Label>
+                            <Input
+                              type="number"
+                              value={schedule.duration}
+                              onChange={(e) => handleScheduleChange("pump", index, "duration", Number(e.target.value))}
+                              className="w-20"
+                            />
+                            <span className="text-sm text-gray-500">phút</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeSchedule("pump", index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    <Label className="text-lg font-medium">Thời gian kiểm tra theo độ ẩm</Label>
+                    <div className="text-sm text-gray-600 mb-2">
+                      Kiểm tra mỗi 2 giờ trong các khung giờ: 6:00-10:00 AM và 2:00-5:00 PM
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Fan Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-cyan-100 text-cyan-600">
+                      <Fan className="h-6 w-6" />
+                    </div>
+                    Quạt Thông Gió
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label>Ngưỡng nhiệt độ (°C)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={currentConfig.fan.tempThreshold}
+                          onChange={(e) => handleConfigChange("fan", "tempThreshold", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[currentConfig.fan.tempThreshold]}
+                          onValueChange={(value) => handleConfigChange("fan", "tempThreshold", value[0])}
+                          min={0}
+                          max={50}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Ngưỡng độ ẩm không khí (%)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={currentConfig.fan.humidityThreshold}
+                          onChange={(e) => handleConfigChange("fan", "humidityThreshold", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[currentConfig.fan.humidityThreshold]}
+                          onValueChange={(value) => handleConfigChange("fan", "humidityThreshold", value[0])}
+                          min={0}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label>Thời gian hoạt động (phút)</Label>
+                      <Input
+                        type="number"
+                        value={currentConfig.fan.duration}
+                        onChange={(e) => handleConfigChange("fan", "duration", Number(e.target.value))}
+                        className="w-20"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Kiểm tra mỗi (phút)</Label>
+                      <Input
+                        type="number"
+                        value={currentConfig.fan.checkInterval}
+                        onChange={(e) => handleConfigChange("fan", "checkInterval", Number(e.target.value))}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cover Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-amber-100 text-amber-600">
+                      <Umbrella className="h-6 w-6" />
+                    </div>
+                    Mái Che
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-3">
+                    <Label>Ngưỡng nhiệt độ (°C)</Label>
+                    <div className="flex items-center gap-4">
+                      <Input
+                        type="number"
+                        value={currentConfig.cover.tempThreshold}
+                        onChange={(e) => handleConfigChange("cover", "tempThreshold", Number(e.target.value))}
+                        className="w-20"
+                      />
+                      <Slider
+                        value={[currentConfig.cover.tempThreshold]}
+                        onValueChange={(value) => handleConfigChange("cover", "tempThreshold", value[0])}
+                        min={0}
+                        max={50}
+                        step={1}
+                        className="flex-1"
+                      />
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Mái che sẽ đóng khi nhiệt độ &gt; {currentConfig.cover.tempThreshold}°C
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label>Thiết bị điều khiển</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedParameter("soilMoisture")
-                          setSelectedDevices([])
-                          setDialogOpen(true)
-                        }}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Thêm thiết bị
+                      <Label className="text-lg font-medium">Lịch hoạt động theo giờ</Label>
+                      <Button size="sm" variant="outline" onClick={() => addSchedule("cover")}>
+                        <Plus className="mr-1 h-4 w-4" />
+                        Thêm lịch
                       </Button>
                     </div>
-
-                    <div className="space-y-3 rounded-md border p-3">
-                      {thresholds.soilMoisture.devices.length === 0 ? (
-                        <div className="text-center text-sm text-gray-500 py-2">Chưa có thiết bị nào được thêm</div>
-                      ) : (
-                        thresholds.soilMoisture.devices.map((device) => {
-                          const DeviceIcon = getDeviceIcon(device.deviceId)
-                          return (
-                            <div key={device.deviceId} className="rounded-md border p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <DeviceIcon className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">{device.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    checked={device.active}
-                                    onCheckedChange={() => handleToggleDeviceActive("soilMoisture", device.deviceId)}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveDevice("soilMoisture", device.deviceId)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Bật khi ≤</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.onValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "soilMoisture",
-                                        device.deviceId,
-                                        "onValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Tắt khi ≥</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.offValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "soilMoisture",
-                                        device.deviceId,
-                                        "offValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })
-                      )}
+                    <div className="space-y-3">
+                      {currentConfig.cover.schedules.map((schedule: any, index: number) => (
+                        <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Từ:</Label>
+                            <Input
+                              type="time"
+                              value={schedule.start}
+                              onChange={(e) => handleScheduleChange("cover", index, "start", e.target.value)}
+                              className="w-32"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Đến:</Label>
+                            <Input
+                              type="time"
+                              value={schedule.end}
+                              onChange={(e) => handleScheduleChange("cover", index, "end", e.target.value)}
+                              className="w-32"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Vị trí:</Label>
+                            <Select
+                              value={schedule.position}
+                              onValueChange={(value) => handleScheduleChange("cover", index, "position", value)}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="closed">Đóng (180°)</SelectItem>
+                                <SelectItem value="half-open">Mở vừa (60°)</SelectItem>
+                                <SelectItem value="open">Mở (90°)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeSchedule("cover", index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Cường độ ánh sáng */}
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
-                <Sun className="h-5 w-5 text-yellow-500" />
-                <CardTitle>Cường độ ánh sáng (Lux)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="light-min">Ngưỡng tối thiểu</Label>
-                      <Input
-                        id="light-min"
-                        type="number"
-                        value={thresholds.light.min}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            light: {
-                              ...thresholds.light,
-                              min: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="light-max">Ngưỡng tối đa</Label>
-                      <Input
-                        id="light-max"
-                        type="number"
-                        value={thresholds.light.max}
-                        onChange={(e) =>
-                          setThresholds({
-                            ...thresholds,
-                            light: {
-                              ...thresholds.light,
-                              max: Number(e.target.value),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Thiết bị điều khiển</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedParameter("light")
-                          setSelectedDevices([])
-                          setDialogOpen(true)
-                        }}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Thêm thiết bị
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3 rounded-md border p-3">
-                      {thresholds.light.devices.length === 0 ? (
-                        <div className="text-center text-sm text-gray-500 py-2">Chưa có thiết bị nào được thêm</div>
-                      ) : (
-                        thresholds.light.devices.map((device) => {
-                          const DeviceIcon = getDeviceIcon(device.deviceId)
-                          return (
-                            <div key={device.deviceId} className="rounded-md border p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <DeviceIcon className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">{device.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    checked={device.active}
-                                    onCheckedChange={() => handleToggleDeviceActive("light", device.deviceId)}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleRemoveDevice("light", device.deviceId)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">
-                                    {device.deviceId === 3 ? "Đóng khi ≥" : "Bật khi ≤"}
-                                  </Label>
-                                  <Input
-                                    type="number"
-                                    value={device.onValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "light",
-                                        device.deviceId,
-                                        "onValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">{device.deviceId === 3 ? "Mở khi ≤" : "Tắt khi ≥"}</Label>
-                                  <Input
-                                    type="number"
-                                    value={device.offValue}
-                                    onChange={(e) =>
-                                      handleDeviceThresholdChange(
-                                        "light",
-                                        device.deviceId,
-                                        "offValue",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="h-8"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex justify-end gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentConfig(configs[selectedConfig as keyof typeof configs])}
+              >
+                Đặt lại
+              </Button>
+              <Button onClick={handleSaveConfig} className="bg-green-600 hover:bg-green-700">
+                <Check className="mr-2 h-4 w-4" />
+                Lưu cấu hình
+              </Button>
+            </div>
           </div>
+        </TabsContent>
 
-          <div className="mt-6 flex justify-end gap-4">
-            <Button variant="outline">Đặt lại mặc định</Button>
-            <Button>Lưu thay đổi</Button>
+        <TabsContent value="alerts" className="mt-6">
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-orange-600 mb-2">Cấu hình cảnh báo</h2>
+              <p className="text-gray-600">Thiết lập ngưỡng cảnh báo cho các thông số môi trường</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Temperature Alert */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-red-100 text-red-600">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    Nhiệt độ (°C)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label>Ngưỡng cảnh báo</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Hiển thị cảnh báo màu vàng khi vượt ngưỡng này</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.temperature.warning}
+                          onChange={(e) => handleAlertConfigChange("temperature", "warning", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[alertConfig.temperature.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("temperature", "warning", value[0])}
+                          min={0}
+                          max={50}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label>Ngưỡng nguy hiểm</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Hiển thị cảnh báo màu đỏ khi vượt ngưỡng này</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.temperature.danger}
+                          onChange={(e) => handleAlertConfigChange("temperature", "danger", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[alertConfig.temperature.danger]}
+                          onValueChange={(value) => handleAlertConfigChange("temperature", "danger", value[0])}
+                          min={0}
+                          max={50}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Humidity Alert */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    Độ ẩm (%)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <Label>Ngưỡng cảnh báo</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.humidity.warning}
+                          onChange={(e) => handleAlertConfigChange("humidity", "warning", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[alertConfig.humidity.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("humidity", "warning", value[0])}
+                          min={0}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label>Ngưỡng nguy hiểm</Label>
+                        <div className="flex items-center gap-4">
+                          <Input
+                            type="number"
+                            value={alertConfig.humidity.danger}
+                            onChange={(e) => handleAlertConfigChange("humidity", "danger", Number(e.target.value))}
+                            className="w-20"
+                          />
+                          <Slider
+                            value={[alertConfig.humidity.danger]}
+                            onValueChange={(value) => handleAlertConfigChange("humidity", "danger", value[0])}
+                            min={0}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Soil Moisture Alert */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-green-100 text-green-600">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    Độ ẩm đất (%)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <Label>Ngưỡng cảnh báo (thấp)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.soilMoisture.warning}
+                          onChange={(e) => handleAlertConfigChange("soilMoisture", "warning", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[alertConfig.soilMoisture.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("soilMoisture", "warning", value[0])}
+                          min={0}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Ngưỡng nguy hiểm (thấp)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.soilMoisture.danger}
+                          onChange={(e) => handleAlertConfigChange("soilMoisture", "danger", Number(e.target.value))}
+                          className="w-20"
+                        />
+                        <Slider
+                          value={[alertConfig.soilMoisture.danger]}
+                          onValueChange={(value) => handleAlertConfigChange("soilMoisture", "danger", value[0])}
+                          min={0}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Light Alert */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-yellow-100 text-yellow-600">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    Cường độ ánh sáng (Lux)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <Label>Ngưỡng cảnh báo (cao)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.light.warning}
+                          onChange={(e) => handleAlertConfigChange("light", "warning", Number(e.target.value))}
+                          className="w-24"
+                        />
+                        <Slider
+                          value={[alertConfig.light.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("light", "warning", value[0])}
+                          min={0}
+                          max={10000}
+                          step={100}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Ngưỡng nguy hiểm (rất cao)</Label>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="number"
+                          value={alertConfig.light.danger}
+                          onChange={(e) => handleAlertConfigChange("light", "danger", Number(e.target.value))}
+                          className="w-24"
+                        />
+                        <Slider
+                          value={[alertConfig.light.danger]}
+                          onValueChange={(value) => handleAlertConfigChange("light", "danger", value[0])}
+                          min={0}
+                          max={10000}
+                          step={100}
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end gap-4">
+              <Button variant="outline">Đặt lại mặc định</Button>
+              <Button onClick={handleSaveAlertConfig} className="bg-orange-600 hover:bg-orange-700">
+                <Check className="mr-2 h-4 w-4" />
+                Lưu cấu hình cảnh báo
+              </Button>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Dialog thêm thiết bị */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Thêm thiết bị điều khiển</DialogTitle>
-            <DialogDescription>Chọn thiết bị để thêm vào danh sách điều khiển cho tham số này.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            {availableDevices.map((device) => {
-              // Kiểm tra xem thiết bị đã được thêm vào tham số này chưa
-              const isAdded =
-                selectedParameter &&
-                thresholds[selectedParameter as keyof typeof thresholds].devices.some((d) => d.deviceId === device.id)
-
-              if (isAdded) return null
-
-              return (
-                <div key={device.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`device-${device.id}`}
-                    checked={selectedDevices.includes(device.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedDevices([...selectedDevices, device.id])
-                      } else {
-                        setSelectedDevices(selectedDevices.filter((id) => id !== device.id))
-                      }
-                    }}
-                  />
-                  <Label htmlFor={`device-${device.id}`} className="flex items-center gap-2">
-                    <device.icon className="h-4 w-4" />
-                    {device.name}
-                  </Label>
-                </div>
-              )
-            })}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={handleAddDevices} disabled={selectedDevices.length === 0}>
-              <Check className="mr-1 h-4 w-4" />
-              Thêm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

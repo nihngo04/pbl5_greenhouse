@@ -1,3 +1,3 @@
-from app.api import sensors, images
+from app.api import sensors, images, devices, control
 
-__all__ = ['sensors', 'images']
+__all__ = ['sensors', 'images', 'devices', 'control']

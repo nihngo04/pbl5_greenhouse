@@ -7,16 +7,28 @@ class Config:
     
     # Database
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres:admin123@localhost:5432/greenhouse'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # MQTT Configuration
+    SQLALCHEMY_TRACK_MODIFICATIONS = False    # MQTT Configuration
     MQTT_BROKER = os.environ.get('MQTT_BROKER') or 'localhost'
     MQTT_PORT = int(os.environ.get('MQTT_PORT') or 1883)
+    MQTT_USERNAME = os.environ.get('MQTT_USERNAME') or None
+    MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD') or None
+    
     MQTT_TOPICS = {
+        # Sensor topics
         'temperature': 'greenhouse/sensors/temperature',
         'humidity': 'greenhouse/sensors/humidity',
         'soil': 'greenhouse/sensors/soil',
-        'light': 'greenhouse/sensors/light'
+        'light': 'greenhouse/sensors/light',
+        
+        # Device status topics (cập nhật để khớp với format thực tế)
+        'pump_status': 'greenhouse/devices/pump/status',
+        'fan_status': 'greenhouse/devices/fan/status',
+        'cover_status': 'greenhouse/devices/cover/status',
+        
+        # Device control topics
+        'pump': 'greenhouse/control/pump',
+        'fan': 'greenhouse/control/fan',
+        'cover': 'greenhouse/control/cover'
     }
     
     # Image Storage
