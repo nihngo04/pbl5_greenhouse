@@ -1,0 +1,52 @@
+2025-06-11 03:02:29,502 - app.services.automated_scheduler - INFO - Automated Scheduler initialized
+2025-06-11 03:02:29,503 - app.services.automated_scheduler - INFO - Scheduler loop started
+2025-06-11 03:02:29,503 - app.services.automated_scheduler - INFO - Automated Scheduler started
+2025-06-11 03:02:29,610 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: fan -> False
+2025-06-11 03:02:29,614 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: fan1
+2025-06-11 03:02:29,615 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> CLOSED
+2025-06-11 03:02:29,616 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 03:02:39,505 - app.services.automated_scheduler - INFO - [MANUAL] Manual override registered for fan
+2025-06-11 03:02:39,505 - app.services.automated_scheduler - WARNING - [WARNING] Scheduler not running, configurations will be used on next start
+2025-06-11 03:02:39,507 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> CLOSED
+2025-06-11 03:02:39,507 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 03:02:39,507 - app.services.automated_scheduler - INFO - [SUCCESS] Forced schedule check completed
+2025-06-11 03:02:39,508 - app.services.automated_scheduler - INFO - Scheduler loop ended
+2025-06-11 03:02:39,508 - app.services.automated_scheduler - INFO - Automated Scheduler stopped
+2025-06-11 03:10:58,022 - app - INFO - Logging system initialized
+2025-06-11 03:10:58,252 - app - INFO - MQTT client will be initialized on first use
+2025-06-11 03:10:58,325 - app.services.timescale - INFO - TimescaleDB initialized successfully
+2025-06-11 03:10:58,325 - app - INFO - TimescaleDB initialized successfully
+2025-06-11 03:10:58,326 - app - INFO - Application initialized successfully
+2025-06-11 03:10:58,326 - app.services.automated_scheduler - INFO - Automated Scheduler initialized
+2025-06-11 03:10:58,326 - app.services.automated_scheduler - INFO - Scheduler loop started
+2025-06-11 03:10:58,326 - app.services.automated_scheduler - INFO - Automated Scheduler started
+2025-06-11 03:10:58,353 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: fan -> False
+2025-06-11 03:10:58,358 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: fan1
+2025-06-11 03:10:58,359 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> CLOSED
+2025-06-11 03:10:58,360 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 03:11:00,328 - app.services.automated_scheduler - INFO - Scheduler loop ended
+2025-06-11 03:11:00,328 - app.services.automated_scheduler - INFO - Automated Scheduler stopped
+2025-06-11 06:15:36,963 - app.services.automated_scheduler - INFO - Automated Scheduler initialized
+2025-06-11 06:15:36,964 - app.services.automated_scheduler - INFO - Scheduler loop started
+2025-06-11 06:15:36,964 - app.services.automated_scheduler - INFO - Automated Scheduler started
+2025-06-11 06:15:37,075 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: fan -> False
+2025-06-11 06:15:37,078 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: fan1
+2025-06-11 06:15:37,079 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> OPEN
+2025-06-11 06:15:37,080 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 06:15:46,965 - app.services.automated_scheduler - INFO - [MANUAL] Manual override registered for fan
+2025-06-11 06:15:46,965 - app.services.automated_scheduler - INFO - [CACHE] Cleared 0 cached device configurations
+2025-06-11 06:15:46,968 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> OPEN
+2025-06-11 06:15:46,968 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 06:15:46,969 - app.services.automated_scheduler - INFO - [SUCCESS] Configuration reload completed
+2025-06-11 06:15:46,971 - app.services.automated_scheduler - INFO - [EXEC] Executing scheduled action: cover -> OPEN
+2025-06-11 06:15:46,972 - app.services.automated_scheduler - INFO - [SUCCESS] Scheduled action executed successfully: cover1
+2025-06-11 06:15:46,972 - app.services.automated_scheduler - INFO - [SUCCESS] Forced schedule check completed
+2025-06-11 06:15:46,972 - app.services.automated_scheduler - INFO - Scheduler loop ended
+2025-06-11 06:15:46,972 - app.services.automated_scheduler - INFO - Automated Scheduler stopped
+2025-06-11 06:27:51,130 - app.services.mqtt_client - INFO - Setting up MQTT client...
+2025-06-11 06:27:51,131 - app.services.mqtt_client - INFO - Connecting to MQTT broker: localhost:1883
+2025-06-11 06:27:51,136 - app.services.mqtt_client - INFO - MQTT client setup completed
+2025-06-11 06:27:51,136 - app.services.mqtt_client - INFO - Connected to MQTT broker successfully
+2025-06-11 06:27:51,136 - app.services.mqtt_client - INFO - MQTT client created and initialized
+2025-06-11 06:27:51,136 - app.services.monitoring - INFO - MQTT client connected
+2025-06-11 06:27:51,137 - app.services.automated_scheduler - INFO - Automated Scheduler initialized

@@ -89,8 +89,7 @@ def get_sensor_data():
     Query params:
         device_id: ID của thiết bị (optional)
         sensor_type: Loại cảm biến (optional)
-        start_time: Thời gian bắt đầu (ví dụ: '24h', '7d')
-    """
+        start_time: Thời gian bắt đầu (ví dụ: '24h', '7d')    """
     device_id = request.args.get('device_id')
     sensor_type = request.args.get('sensor_type')
     start_time = request.args.get('start_time', '24h')
@@ -105,7 +104,6 @@ def get_sensor_data():
                         sd.value,
                         sd.time
                     FROM sensor_data sd
-                    JOIN devices d ON sd.device_id = d.id
                     WHERE 
                         (:device_id IS NULL OR sd.device_id = :device_id) AND
                         (:sensor_type IS NULL OR sd.sensor_type = :sensor_type) AND
@@ -136,21 +134,21 @@ def get_sensor_data():
 @bp.route('/api/sensors/latest', methods=['GET'])
 def get_latest_values():
     """API endpoint để lấy giá trị mới nhất của tất cả các cảm biến"""
-    device_id = request.args.get('device_id')
+    device_id = request.args.get('device_id', 'greenhouse_1')  # Default device_id
     
     try:
         with engine.connect() as conn:
+            # Get latest value for each sensor type
             result = conn.execute(
                 text("""
-                    SELECT 
+                    SELECT DISTINCT ON (sensor_type)
                         device_id,
                         sensor_type,
                         value,
                         time
                     FROM sensor_data
                     WHERE device_id = :device_id
-                    ORDER BY time DESC
-                    LIMIT 1;
+                    ORDER BY sensor_type, time DESC;
                 """),
                 {'device_id': device_id}
             )

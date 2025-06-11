@@ -2,6 +2,7 @@ import time
 from functools import wraps
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Optional, Tuple, Union
+import re
 
 # Simple in-memory cache
 # In production, consider using Redis
@@ -124,3 +125,21 @@ def get_cached_sensor_data(
         if expiry is None or time.time() < expiry:
             return value
     return None
+
+def delete_pattern(pattern: str) -> int:
+    """Delete cache entries matching a pattern"""
+    deleted_count = 0
+    keys_to_delete = []
+    
+    # Convert pattern to regex (simple glob pattern support)
+    regex_pattern = pattern.replace('*', '.*')
+    
+    for key in cache_store.keys():
+        if re.match(regex_pattern, key):
+            keys_to_delete.append(key)
+    
+    for key in keys_to_delete:
+        del cache_store[key]
+        deleted_count += 1
+    
+    return deleted_count

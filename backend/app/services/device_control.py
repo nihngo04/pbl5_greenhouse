@@ -23,28 +23,79 @@ def get_device_config(device_id):
 def update_device_config(device_id, config_data):
     """Update device configuration"""
     try:
+        # Prepare default values for missing fields
+        default_config = {
+            'mode': 'automatic',
+            'schedule_type': None,
+            'start_humidity': None,
+            'end_humidity': None,
+            'start_temperature': None,
+            'end_temperature': None,
+            'duration_minutes': None,
+            'check_interval_minutes': None,
+            'active_hours': None,
+            'plant_stage': None
+        }
+        
+        # Merge with provided config data
+        final_config = default_config.copy()
+        final_config.update(config_data)
+        
+        # Handle active_hours JSON conversion
+        if final_config['active_hours'] and not isinstance(final_config['active_hours'], str):
+            import json
+            final_config['active_hours'] = json.dumps(final_config['active_hours'])
+        
         with engine.begin() as conn:
-            conn.execute(text("""
-                UPDATE device_configs
-                SET mode = :mode,
-                    schedule_type = :schedule_type,
-                    start_humidity = :start_humidity,
-                    end_humidity = :end_humidity,
-                    start_temperature = :start_temperature,
-                    end_temperature = :end_temperature,
-                    duration_minutes = :duration_minutes,
-                    check_interval_minutes = :check_interval_minutes,
-                    active_hours = :active_hours,
-                    plant_stage = :plant_stage,
-                    last_updated = CURRENT_TIMESTAMP
-                WHERE device_id = :device_id
-            """), {
-                'device_id': device_id,
-                **config_data
-            })
+            # First check if device config exists
+            result = conn.execute(text("""
+                SELECT device_id FROM device_configs WHERE device_id = :device_id
+            """), {'device_id': device_id})
+            
+            if result.fetchone():
+                # Update existing config - Fix the SQL parameter format
+                conn.execute(text("""
+                    UPDATE device_configs
+                    SET mode = :mode,
+                        schedule_type = :schedule_type,
+                        start_humidity = :start_humidity,
+                        end_humidity = :end_humidity,
+                        start_temperature = :start_temperature,
+                        end_temperature = :end_temperature,
+                        duration_minutes = :duration_minutes,
+                        check_interval_minutes = :check_interval_minutes,
+                        active_hours = CAST(:active_hours AS jsonb),
+                        plant_stage = :plant_stage,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE device_id = :device_id
+                """), {
+                    'device_id': device_id,
+                    **final_config
+                })
+            else:
+                # Insert new config
+                conn.execute(text("""
+                    INSERT INTO device_configs (
+                        device_id, mode, schedule_type, start_humidity, end_humidity,
+                        start_temperature, end_temperature, duration_minutes, 
+                        check_interval_minutes, active_hours, plant_stage, last_updated
+                    ) VALUES (
+                        :device_id, :mode, :schedule_type, :start_humidity, :end_humidity,
+                        :start_temperature, :end_temperature, :duration_minutes,
+                        :check_interval_minutes, CAST(:active_hours AS jsonb), :plant_stage, CURRENT_TIMESTAMP
+                    )
+                """), {
+                    'device_id': device_id,
+                    **final_config
+                })
+            
+            logger.info(f"Device config updated successfully for {device_id}")
             return True
+            
     except Exception as e:
-        logger.error(f"Failed to update device config: {e}")
+        logger.error(f"Failed to update device config for {device_id}: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def check_time_schedule(active_hours):

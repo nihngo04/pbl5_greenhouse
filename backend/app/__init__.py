@@ -30,15 +30,17 @@ def create_app(config_class=Config):
           # Register error handlers
         register_error_handlers(app)        # Initialize MQTT client on-demand (to prevent startup hanging)
         # MQTT will be initialized when first requested
-        app.logger.info("MQTT client will be initialized on first use")
-            
-        # Register blueprints
-        from app.api import sensors, images, monitoring, control, devices
+        app.logger.info("MQTT client will be initialized on first use")        # Register blueprints
+        from app.api import sensors, images, monitoring, control, devices, dashboard, scheduler, notifications, configurations
         app.register_blueprint(sensors.bp)
         app.register_blueprint(images.bp)
         app.register_blueprint(monitoring.bp)
         app.register_blueprint(control.router)
         app.register_blueprint(devices.bp)
+        app.register_blueprint(dashboard.bp)
+        app.register_blueprint(scheduler.bp)
+        app.register_blueprint(notifications.bp)
+        app.register_blueprint(configurations.bp)
         
         @app.route('/health')
         def health_check():
@@ -61,14 +63,21 @@ def create_app(config_class=Config):
             """Log response information"""
             app.logger.debug(f"Response: {response.status}")
             return response
-        
-        # Initialize TimescaleDB
+          # Initialize TimescaleDB
         from app.services.timescale import init_timescaledb
         try:
             init_timescaledb()
             app.logger.info("TimescaleDB initialized successfully")
         except Exception as e:
             app.logger.error(f"Failed to initialize TimescaleDB: {e}")
+        
+        # Initialize Configuration Scheduler
+        from app.services.configuration_scheduler import get_configuration_scheduler
+        try:
+            scheduler = get_configuration_scheduler()
+            app.logger.info("Configuration scheduler initialized and ready")
+        except Exception as e:
+            app.logger.error(f"Failed to initialize configuration scheduler: {e}")
         
         app.logger.info('Application initialized successfully')
     

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test LocalStorage Config Persistence</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+        }
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test LocalStorage Config Persistence</h1>
+        <p>Công cụ này giúp kiểm tra và debug localStorage cho cấu hình thiết bị</p>
+
+        <div class="test-section info">
+            <h3>📋 Hướng dẫn Test</h3>
+            <ol>
+                <li>Mở tab Management tại <a href="http://localhost:3000/management" target="_blank">http://localhost:3000/management</a></li>
+                <li>Chuyển sang tab "Cấu hình thiết bị"</li>
+                <li>Chọn một cấu hình từ dropdown</li>
+                <li>Thay đổi vị trí mái che (ví dụ: thêm lịch mới hoặc sửa vị trí)</li>
+                <li>Nhấn "Lưu cấu hình"</li>
+                <li>Reload trang và kiểm tra lại</li>
+                <li>Dùng các button dưới đây để debug</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Kiểm tra LocalStorage</h3>
+            <button onclick="checkLocalStorage()">Kiểm tra LocalStorage</button>
+            <button onclick="showSavedConfigs()">Xem Configs đã lưu</button>
+            <button onclick="showSelectedConfig()">Xem Config đã chọn</button>
+            <div id="localStorageResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧹 Quản lý LocalStorage</h3>
+            <button onclick="clearDeviceConfigs()" class="clear-btn">Xóa Device Configs</button>
+            <button onclick="clearSelectedConfig()" class="clear-btn">Xóa Selected Config</button>
+            <button onclick="clearAllLocalStorage()" class="clear-btn">Xóa tất cả LocalStorage</button>
+            <div id="clearResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Test Data Generator</h3>
+            <button onclick="generateTestConfig()">Tạo Test Config</button>
+            <button onclick="setTestSelection()">Set Test Selection</button>
+            <div id="testResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Current LocalStorage Data</h3>
+            <button onclick="refreshDisplay()">Refresh Display</button>
+            <div id="currentData"></div>
+        </div>
+    </div>
+
+    <script>
+        function checkLocalStorage() {
+            const result = document.getElementById('localStorageResult');
+            const deviceConfigs = localStorage.getItem('device_configs');
+            const selectedConfig = localStorage.getItem('selected_device_config');
+            
+            let html = '<h4>📝 LocalStorage Status:</h4>';
+            
+            if (deviceConfigs) {
+                try {
+                    const configs = JSON.parse(deviceConfigs);
+                    html += `<div class="success">✅ device_configs found (${Object.keys(configs).length} configs)</div>`;
+                } catch (e) {
+                    html += `<div class="error">❌ device_configs invalid JSON: ${e.message}</div>`;
+                }
+            } else {
+                html += '<div class="error">❌ device_configs not found</div>';
+            }
+            
+            if (selectedConfig) {
+                html += `<div class="success">✅ selected_device_config: ${selectedConfig}</div>`;
+            } else {
+                html += '<div class="error">❌ selected_device_config not found</div>';
+            }
+            
+            result.innerHTML = html;
+        }
+
+        function showSavedConfigs() {
+            const result = document.getElementById('localStorageResult');
+            const deviceConfigs = localStorage.getItem('device_configs');
+            
+            if (deviceConfigs) {
+                try {
+                    const configs = JSON.parse(deviceConfigs);
+                    let html = '<h4>📋 Saved Configurations:</h4>';
+                    
+                    for (const [key, config] of Object.entries(configs)) {
+                        html += `<div class="info">
+                            <strong>Key:</strong> ${key}<br>
+                            <strong>Name:</strong> ${config.name}<br>
+                            <strong>Cover Schedules:</strong> ${config.cover.schedules.length}<br>
+                            <details>
+                                <summary>Chi tiết</summary>
+                                <pre>${JSON.stringify(config, null, 2)}</pre>
+                            </details>
+                        </div>`;
+                    }
+                    
+                    result.innerHTML = html;
+                } catch (e) {
+                    result.innerHTML = `<div class="error">❌ Error parsing configs: ${e.message}</div>`;
+                }
+            } else {
+                result.innerHTML = '<div class="error">❌ No saved configs found</div>';
+            }
+        }
+
+        function showSelectedConfig() {
+            const result = document.getElementById('localStorageResult');
+            const selectedConfig = localStorage.getItem('selected_device_config');
+            const deviceConfigs = localStorage.getItem('device_configs');
+            
+            if (selectedConfig && deviceConfigs) {
+                try {
+                    const configs = JSON.parse(deviceConfigs);
+                    const config = configs[selectedConfig];
+                    
+                    if (config) {
+                        result.innerHTML = `
+                            <h4>🎯 Selected Configuration: ${selectedConfig}</h4>
+                            <div class="success">
+                                <strong>Name:</strong> ${config.name}<br>
+                                <strong>Cover Schedules:</strong>
+                                <pre>${JSON.stringify(config.cover.schedules, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        result.innerHTML = `<div class="error">❌ Selected config "${selectedConfig}" not found in saved configs</div>`;
+                    }
+                } catch (e) {
+                    result.innerHTML = `<div class="error">❌ Error: ${e.message}</div>`;
+                }
+            } else {
+                result.innerHTML = '<div class="error">❌ No selected config or saved configs found</div>';
+            }
+        }
+
+        function clearDeviceConfigs() {
+            localStorage.removeItem('device_configs');
+            document.getElementById('clearResult').innerHTML = '<div class="success">✅ Device configs cleared</div>';
+            refreshDisplay();
+        }
+
+        function clearSelectedConfig() {
+            localStorage.removeItem('selected_device_config');
+            document.getElementById('clearResult').innerHTML = '<div class="success">✅ Selected config cleared</div>';
+            refreshDisplay();
+        }
+
+        function clearAllLocalStorage() {
+            localStorage.clear();
+            document.getElementById('clearResult').innerHTML = '<div class="success">✅ All localStorage cleared</div>';
+            refreshDisplay();
+        }
+
+        function generateTestConfig() {
+            const testConfigs = {
+                "test-config": {
+                    name: "Test Configuration",
+                    pump: {
+                        soilMoistureThreshold: 50,
+                        schedules: [{ time: "07:00", duration: 10 }],
+                        checkIntervals: [{ start: "08:00", end: "16:00", interval: 2 }]
+                    },
+                    fan: {
+                        tempThreshold: 25,
+                        humidityThreshold: 80,
+                        duration: 15,
+                        checkInterval: 30
+                    },
+                    cover: {
+                        tempThreshold: 32,
+                        schedules: [
+                            { start: "09:00", end: "11:00", position: "half-open" },
+                            { start: "13:00", end: "16:00", position: "closed" }
+                        ]
+                    }
+                }
+            };
+            
+            localStorage.setItem('device_configs', JSON.stringify(testConfigs));
+            localStorage.setItem('selected_device_config', 'test-config');
+            
+            document.getElementById('testResult').innerHTML = '<div class="success">✅ Test configuration generated</div>';
+            refreshDisplay();
+        }
+
+        function setTestSelection() {
+            localStorage.setItem('selected_device_config', 'cay-non');
+            document.getElementById('testResult').innerHTML = '<div class="success">✅ Test selection set to "cay-non"</div>';
+            refreshDisplay();
+        }
+
+        function refreshDisplay() {
+            const currentData = document.getElementById('currentData');
+            const allKeys = Object.keys(localStorage);
+            const relevantKeys = allKeys.filter(key => 
+                key.includes('device') || key.includes('config') || key.includes('selected')
+            );
+            
+            let html = '<h4>💾 Current LocalStorage Data:</h4>';
+            
+            if (relevantKeys.length === 0) {
+                html += '<div class="info">📭 No relevant data found</div>';
+            } else {
+                relevantKeys.forEach(key => {
+                    const value = localStorage.getItem(key);
+                    html += `<div class="info">
+                        <strong>${key}:</strong><br>
+                        <pre>${value.length > 200 ? value.substring(0, 200) + '...' : value}</pre>
+                    </div>`;
+                });
+            }
+            
+            currentData.innerHTML = html;
+        }
+
+        // Auto refresh on load
+        window.onload = function() {
+            refreshDisplay();
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html>

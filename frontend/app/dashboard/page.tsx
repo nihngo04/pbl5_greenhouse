@@ -1,229 +1,140 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { Thermometer, Droplets, Sprout, Sun, Fan, Droplet, Umbrella } from "lucide-react"
-import { ModernGaugeCard } from "@/components/modern-gauge-card"
-import { EnhancedDeviceCard } from "@/components/enhanced-device-card"
-import { ModernAlertCard } from "@/components/modern-alert-card"
-import { motion } from "framer-motion"
-import { greenhouseAPI, type DashboardData, type DeviceState, type Alert } from "@/lib/api"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Fan, Droplet, Shield, Clock, Thermometer, Droplets, Sprout, Sun, Umbrella } from 'lucide-react'
+import { EnhancedDeviceCard } from '@/components/enhanced-device-card'
+import { ModernGaugeCard } from '@/components/modern-gauge-card'
+import { ModernAlertCard } from '@/components/modern-alert-card'
+import { SystemStatusCard } from '@/components/system-status-card'
+import { useGlobalState, useDataSync, useConflictDetection } from '@/lib/global-state'
+import { useSchedulerStatus } from '@/hooks/use-scheduler-status'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert } from '@/lib/api'
 
 export default function Dashboard() {
   const router = useRouter()
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [devices, setDevices] = useState<DeviceState[]>([])
-  const [alerts, setAlerts] = useState<Alert[]>([])
-  const [loading, setLoading] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<string>("")
+    // Global state hooks
+  const sensors = useGlobalState(state => state.sensors)
+  const devices = useGlobalState(state => state.devices)
+  const isLoading = useGlobalState(state => state.isLoading)
+  const lastSync = useGlobalState(state => state.lastSync)
+  
+  // Data sync hooks
+  const { syncFromAPI, needsSync } = useDataSync()
+  
+  // Conflict detection
+  const { conflicts, hasConflicts, resolveConflict } = useConflictDetection()
+  
+  // Scheduler status
+  const { 
+    schedulerStatus, 
+    cacheStatus,
+    loading: schedulerLoading 
+  } = useSchedulerStatus()
+  
+  // Local loading state for device control
   const [controlLoading, setControlLoading] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<Alert[]>([])
 
-  // Fetch initial data
+  // Initial data fetch
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        
-        // Try new API first, fallback to old API if needed
-        try {
-          const dashboardResponse = await greenhouseAPI.getDashboardOverview()
-          setDashboardData(dashboardResponse)
-          setDevices(dashboardResponse.devices)
-        } catch (error) {
-          console.log('New API not available, using fallback')
-          // Fallback to old APIs
-          const [sensorResponse, deviceResponse] = await Promise.all([
-            greenhouseAPI.getSensorData(),
-            greenhouseAPI.getDeviceStates()
-          ])
-          
-          // Convert old format to new format
-          const mockDashboard: DashboardData = {
-            sensors: {
-              temperature: {
-                device_id: 'temp1',
-                value: sensorResponse.temperature.value || 0,
-                timestamp: sensorResponse.temperature.timestamp,
-                unit: '°C'
-              },
-              humidity: {
-                device_id: 'hum1',
-                value: sensorResponse.humidity.value || 0,
-                timestamp: sensorResponse.humidity.timestamp,
-                unit: '%'
-              },
-              soil_moisture: {
-                device_id: 'soil1',
-                value: sensorResponse.soil_moisture.value || 0,
-                timestamp: sensorResponse.soil_moisture.timestamp,
-                unit: '%'
-              },
-              light: {
-                device_id: 'light1',
-                value: sensorResponse.light_intensity.value || 0,
-                timestamp: sensorResponse.light_intensity.timestamp,
-                unit: 'lux'
-              }
-            },
-            devices: deviceResponse,
-            system: {
-              mqtt: { connected: true },
-              storage: { total_size_mb: 0 },
-              last_updated: new Date().toISOString()
-            }
-          }
-          
-          setDashboardData(mockDashboard)
-          setDevices(deviceResponse)
-        }
-        
-        // Get alerts
-        try {
-          const alertResponse = await greenhouseAPI.getAlerts()
-          setAlerts(alertResponse)
-        } catch (error) {
-          console.log('Alerts API not available')
-          setAlerts([])
-        }
-        
-        setLastUpdate(new Date().toLocaleTimeString())
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
+    console.log('🚀 Dashboard: Initial data fetch')
+    syncFromAPI()
+    
+    // Also fetch alerts
+    fetchAlerts()
   }, [])
 
-  // Set up real-time updates
+  // Periodic sync (only if needed)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        // Try new API first
-        try {
-          const dashboardResponse = await greenhouseAPI.getDashboardOverview()
-          setDashboardData(dashboardResponse)
-          setDevices(dashboardResponse.devices)
-        } catch (error) {
-          // Fallback to old APIs
-          const [sensorResponse, deviceResponse] = await Promise.all([
-            greenhouseAPI.getSensorData(),
-            greenhouseAPI.getDeviceStates()
-          ])
-          
-          // Update existing dashboard data
-          if (dashboardData) {
-            const updatedDashboard = {
-              ...dashboardData,
-              sensors: {
-                temperature: {
-                  device_id: 'temp1',
-                  value: sensorResponse.temperature.value || 0,
-                  timestamp: sensorResponse.temperature.timestamp,
-                  unit: '°C'
-                },
-                humidity: {
-                  device_id: 'hum1',
-                  value: sensorResponse.humidity.value || 0,
-                  timestamp: sensorResponse.humidity.timestamp,
-                  unit: '%'
-                },
-                soil_moisture: {
-                  device_id: 'soil1',
-                  value: sensorResponse.soil_moisture.value || 0,
-                  timestamp: sensorResponse.soil_moisture.timestamp,
-                  unit: '%'
-                },
-                light: {
-                  device_id: 'light1',
-                  value: sensorResponse.light_intensity.value || 0,
-                  timestamp: sensorResponse.light_intensity.timestamp,
-                  unit: 'lux'
-                }
-              },
-              devices: deviceResponse
-            }
-            setDashboardData(updatedDashboard)
-            setDevices(deviceResponse)
-          }
-        }
-        
-        try {
-          const alertResponse = await greenhouseAPI.getAlerts()
-          setAlerts(alertResponse)
-        } catch (error) {
-          // Ignore alert errors
-        }
-        
-        setLastUpdate(new Date().toLocaleTimeString())
-      } catch (error) {
-        console.error('Error updating data:', error)
+    const interval = setInterval(() => {
+      if (needsSync) {
+        console.log('🔄 Dashboard: Periodic sync triggered')
+        syncFromAPI()
+      } else {
+        console.log('📋 Dashboard: Using cached data, no sync needed')
       }
-    }, 10000) // Update every 10 seconds
+    }, 30000) // Check every 30 seconds, but only sync if needed
 
     return () => clearInterval(interval)
-  }, [dashboardData])
-
-  const handleManageDevice = (deviceType: string) => {
-    router.push(`/management?tab=thresholds&device=${deviceType}`)
-  }
-
-  // Refresh device status after control action
-  const refreshDevices = async () => {
+  }, [needsSync, syncFromAPI])
+  
+  const fetchAlerts = async () => {
     try {
-      const deviceResponse = await greenhouseAPI.getDeviceStates()
-      setDevices(deviceResponse)
-      
-      // Also update dashboard data if available
-      if (dashboardData) {
-        setDashboardData({
-          ...dashboardData,
-          devices: deviceResponse
-        })
+      const response = await fetch('/api/alerts')
+      if (response.ok) {
+        const alertData = await response.json()
+        // Ensure alertData is an array
+        setAlerts(Array.isArray(alertData) ? alertData : [])
       }
     } catch (error) {
-      console.error('Error refreshing devices:', error)
+      console.log('Alerts API not available')
+      setAlerts([]) // Ensure it's always an array
     }
   }
 
-  // Device control handler
+  // Device control handler with conflict detection and immediate UI update
   const handleDeviceControl = async (deviceId: string, deviceType: string, newStatus: boolean | string) => {
     setControlLoading(deviceId)
     
     try {
-      await greenhouseAPI.controlDevice(deviceId, deviceType, newStatus)
+      // Update global state immediately for better UX (especially for cover dropdown)
+      const globalState = useGlobalState.getState()
+      globalState.updateDevices({
+        [deviceType]: newStatus
+      })
       
-      // Update local state immediately for better UX
-      setDevices(prevDevices => 
-        prevDevices.map(device => 
-          device.id === deviceId 
-            ? { ...device, status: newStatus, last_updated: new Date().toISOString() }
-            : device
-        )
-      )
+      // Check for conflicts before making the change
+      const hasConflict = globalState.detectConflict?.(deviceType, newStatus, 'manual')
       
-      // Also update dashboardData if it exists
-      if (dashboardData) {
-        setDashboardData(prev => ({
-          ...prev!,
-          devices: prev!.devices.map(device => 
-            device.id === deviceId 
-              ? { ...device, status: newStatus, last_updated: new Date().toISOString() }
-              : device
-          )
-        }))
+      if (hasConflict) {
+        console.log('⚠️ Conflict detected, but proceeding with manual override')
       }
       
-      console.log(`Device ${deviceId} (${deviceType}) controlled: ${newStatus}`)
+      // Make API call
+      const response = await fetch(`/api/devices/${deviceId}/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_type: deviceType,
+          command: 'SET_STATE',
+          status: newStatus
+        })
+      })
+      
+      if (!response.ok) {
+        // Revert state if API call failed
+        globalState.updateDevices({
+          [deviceType]: devices[deviceType as keyof typeof devices]
+        })
+        throw new Error(`Failed to control device: ${response.statusText}`)
+      }
+      
+      // Record the action
+      globalState.updateScheduler?.({
+        lastAction: {
+          device: deviceType,
+          action: String(newStatus),
+          timestamp: new Date().toISOString(),
+          source: 'manual'
+        }
+      })
+      
+      console.log(`✅ Device ${deviceId} (${deviceType}) controlled: ${newStatus}`)
       
     } catch (error) {
-      console.error(`Error controlling device ${deviceId}:`, error)
+      console.error(`❌ Error controlling device ${deviceId}:`, error)
       alert(`Lỗi điều khiển thiết bị: ${error}`)
     } finally {
       setControlLoading(null)
     }
+  }
+
+  const handleManageDevice = (deviceType: string) => {
+    router.push(`/management?tab=thresholds&device=${deviceType}`)
   }
 
   const container = {
@@ -241,17 +152,16 @@ export default function Dashboard() {
     show: { y: 0, opacity: 1 },
   }
 
-  // Find specific devices
-  const fanDevice = devices.find(d => d.type === 'fan')
-  const pumpDevice = devices.find(d => d.type === 'pump')
-  const coverDevice = devices.find(d => d.type === 'cover')
+  // Mock devices from global state
+  const fanDevice = { id: 'fan1', type: 'fan', status: devices.fan }
+  const pumpDevice = { id: 'pump1', type: 'pump', status: devices.pump }
+  const coverDevice = { id: 'cover1', type: 'cover', status: devices.cover }
 
   const getCoverStatus = (status: string | boolean) => {
     if (typeof status === 'boolean') {
       return status ? "Đang mở" : "Đang đóng"
     }
     
-    // Handle string positions like "OPEN", "HALF", "CLOSED"
     switch(status?.toString().toUpperCase()) {
       case "OPEN":
         return "Đang mở"
@@ -268,7 +178,7 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) {
+  if (isLoading && !sensors.temperature) {
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -280,30 +190,83 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-gray-500">Theo dõi và điều khiển nhà kính của bạn</p>
-          </div>
-          <div className="text-sm text-gray-500">
-            Cập nhật lần cuối: {lastUpdate}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Sensor Cards */}
+    <div className="space-y-8 p-6">
       <motion.div
         variants={container}
         initial="hidden"
         animate="show"
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+        className="space-y-8"
       >
-        <motion.div variants={item}>
+        {/* Header with Cache Status */}
+        <motion.div variants={item} className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <div className="flex items-center gap-4 mt-2">
+              <p className="text-gray-500">Theo dõi và điều khiển nhà kính của bạn</p>
+              {lastSync && (
+                <Badge variant="outline" className="text-xs">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Last sync: {new Date(lastSync).toLocaleTimeString()}
+                </Badge>
+              )}
+              {isLoading && (
+                <Badge variant="secondary" className="text-xs">
+                  Syncing...
+                </Badge>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Conflict Alerts */}
+        {hasConflicts && (
+          <motion.div variants={item} className="mb-6">
+            <Card className="border-orange-200 bg-orange-50">
+              <CardHeader>
+                <CardTitle className="text-orange-800">⚠️ Cảnh báo xung đột</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {conflicts.map(conflict => (
+                  <div key={conflict.id} className="flex justify-between items-center p-2 bg-white rounded mb-2">
+                    <span className="text-sm">{conflict.message}</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => resolveConflict(conflict.id, 'allow')}
+                        className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded"
+                      >
+                        Chấp nhận
+                      </button>
+                      <button 
+                        onClick={() => resolveConflict(conflict.id, 'override')}
+                        className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded"
+                      >
+                        Ghi đè
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}        {/* System Status Card */}
+        <motion.div variants={item} className="mb-8">
+          <SystemStatusCard
+            lastUpdate={lastSync || undefined}
+            isLoading={isLoading}
+            schedulerRunning={schedulerStatus?.running || false}
+            cacheStatus={cacheStatus ? {
+              total_items: cacheStatus.total_items,
+              active_items: cacheStatus.active_items,
+              hit_rate: undefined
+            } : undefined}
+          />
+        </motion.div>
+
+        {/* Sensor Cards - Better spacing and layout */}
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <ModernGaugeCard
             title="Nhiệt độ"
-            value={dashboardData?.sensors?.temperature?.value != null ? Math.round(dashboardData.sensors.temperature.value * 10) / 10 : null}
+            value={sensors.temperature != null ? Math.round(sensors.temperature * 10) / 10 : null}
             unit="°C"
             min={0}
             max={50}
@@ -311,11 +274,9 @@ export default function Dashboard() {
             icon={<Thermometer className="h-5 w-5" />}
             variant="temperature"
           />
-        </motion.div>
-        <motion.div variants={item}>
           <ModernGaugeCard
             title="Độ ẩm"
-            value={dashboardData?.sensors?.humidity?.value != null ? Math.round(dashboardData.sensors.humidity.value * 10) / 10 : null}
+            value={sensors.humidity != null ? Math.round(sensors.humidity * 10) / 10 : null}
             unit="%"
             min={0}
             max={100}
@@ -323,11 +284,9 @@ export default function Dashboard() {
             icon={<Droplets className="h-5 w-5" />}
             variant="humidity"
           />
-        </motion.div>
-        <motion.div variants={item}>
           <ModernGaugeCard
             title="Độ ẩm đất"
-            value={dashboardData?.sensors?.soil_moisture?.value != null ? Math.round(dashboardData.sensors.soil_moisture.value * 10) / 10 : null}
+            value={sensors.soil_moisture != null ? Math.round(sensors.soil_moisture * 10) / 10 : null}
             unit="%"
             min={0}
             max={100}
@@ -335,11 +294,9 @@ export default function Dashboard() {
             icon={<Sprout className="h-5 w-5" />}
             variant="soil"
           />
-        </motion.div>
-        <motion.div variants={item}>
           <ModernGaugeCard
             title="Cường độ ánh sáng"
-            value={dashboardData?.sensors?.light?.value != null ? Math.round(dashboardData.sensors.light.value) : null}
+            value={sensors.light_intensity != null ? Math.round(sensors.light_intensity) : null}
             unit="lux"
             min={0}
             max={20000}
@@ -348,103 +305,68 @@ export default function Dashboard() {
             variant="light"
           />
         </motion.div>
-      </motion.div>
 
-      {/* Device Cards */}
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-      >        {fanDevice && (
-          <motion.div variants={item}>
-            <EnhancedDeviceCard
-              title="Quạt thông gió"
-              deviceId={fanDevice.id}
-              count={1}
-              icon={<Fan className="h-5 w-5" />}
-              isActive={typeof fanDevice.status === 'boolean' ? fanDevice.status : fanDevice.status === 'true'}
-              onToggle={() => {
-                const currentStatus = typeof fanDevice.status === 'boolean' ? fanDevice.status : fanDevice.status === 'true'
-                handleDeviceControl(fanDevice.id, 'fan', !currentStatus)
-              }}
-              onManage={() => handleManageDevice('fan')}
-              variant="fan"
-              onStatusChange={refreshDevices}
-              loading={controlLoading === fanDevice.id}
-            />
-          </motion.div>
-        )}
-        {pumpDevice && (
-          <motion.div variants={item}>
-            <EnhancedDeviceCard
-              title="Bơm nước"
-              deviceId={pumpDevice.id}
-              count={1}
-              icon={<Droplet className="h-5 w-5" />}
-              isActive={typeof pumpDevice.status === 'boolean' ? pumpDevice.status : pumpDevice.status === 'true'}
-              onToggle={() => {
-                const currentStatus = typeof pumpDevice.status === 'boolean' ? pumpDevice.status : pumpDevice.status === 'true'
-                handleDeviceControl(pumpDevice.id, 'pump', !currentStatus)
-              }}
-              onManage={() => handleManageDevice('pump')}
-              variant="pump"
-              onStatusChange={refreshDevices}
-              loading={controlLoading === pumpDevice.id}
-            />
-          </motion.div>
-        )}        {coverDevice && (
-          <motion.div variants={item}>
-            <EnhancedDeviceCard
-              title="Mái che"
-              deviceId={coverDevice.id}
-              status={getCoverStatus(coverDevice.status)}
-              icon={<Umbrella className="h-5 w-5" />}
-              isActive={coverDevice.status} // Pass the actual status string instead of converting to boolean
-              onToggle={() => {
-                // For cover, cycle through states: CLOSED -> OPEN -> HALF -> CLOSED
-                let nextStatus = 'CLOSED'
-                if (coverDevice.status === 'CLOSED') nextStatus = 'OPEN'
-                else if (coverDevice.status === 'OPEN') nextStatus = 'HALF'
-                else nextStatus = 'CLOSED'
-                handleDeviceControl(coverDevice.id, 'cover', nextStatus)
-              }}
-              onManage={() => handleManageDevice('cover')}
-              variant="cover"
-              onStatusChange={refreshDevices}
-              loading={controlLoading === coverDevice.id}
-            />
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* Alerts */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-        <ModernAlertCard alerts={alerts} />
-      </motion.div>
-
-      {/* System Status */}
-      {dashboardData?.system && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Trạng thái hệ thống</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h4 className="font-medium text-gray-700">MQTT Connection</h4>
-                <p className="text-sm text-gray-500">
-                  Status: {dashboardData.system.mqtt?.connected ? 'Đã kết nối' : 'Ngắt kết nối'}
-                </p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-700">Storage</h4>
-                <p className="text-sm text-gray-500">
-                  Total size: {dashboardData.system.storage?.total_size_mb || 0} MB
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Device Control Cards - Better spacing and custom cover handler */}
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <EnhancedDeviceCard
+            title="Quạt thông gió"
+            deviceId={fanDevice.id}
+            count={1}
+            icon={<Fan className="h-5 w-5" />}
+            isActive={typeof fanDevice.status === 'boolean' ? fanDevice.status : fanDevice.status === 'true'}
+            onToggle={() => {
+              const currentStatus = typeof fanDevice.status === 'boolean' ? fanDevice.status : fanDevice.status === 'true'
+              handleDeviceControl(fanDevice.id, 'fan', !currentStatus)
+            }}
+            onManage={() => handleManageDevice('fan')}
+            variant="fan"
+            loading={controlLoading === fanDevice.id}
+          />
+          
+          <EnhancedDeviceCard
+            title="Bơm nước"
+            deviceId={pumpDevice.id}
+            count={1}
+            icon={<Droplet className="h-5 w-5" />}
+            isActive={typeof pumpDevice.status === 'boolean' ? pumpDevice.status : pumpDevice.status === 'true'}
+            onToggle={() => {
+              const currentStatus = typeof pumpDevice.status === 'boolean' ? pumpDevice.status : pumpDevice.status === 'true'
+              handleDeviceControl(pumpDevice.id, 'pump', !currentStatus)
+            }}
+            onManage={() => handleManageDevice('pump')}
+            variant="pump"
+            loading={controlLoading === pumpDevice.id}
+          />
+          
+          <EnhancedDeviceCard
+            title="Mái che"
+            deviceId={coverDevice.id}
+            status={getCoverStatus(coverDevice.status)}
+            icon={<Umbrella className="h-5 w-5" />}
+            isActive={coverDevice.status}
+            onToggle={() => {
+              // For cover, cycle through states: CLOSED -> OPEN -> HALF -> CLOSED
+              let nextStatus = 'CLOSED'
+              if (coverDevice.status === 'CLOSED') nextStatus = 'OPEN'
+              else if (coverDevice.status === 'OPEN') nextStatus = 'HALF'
+              else nextStatus = 'CLOSED'
+              handleDeviceControl(coverDevice.id, 'cover', nextStatus)
+            }}
+            onManage={() => handleManageDevice('cover')}
+            variant="cover"
+            loading={controlLoading === coverDevice.id}
+            onStatusChange={(newStatus) => {
+              // Custom handler for immediate cover status update from dropdown
+              handleDeviceControl(coverDevice.id, 'cover', newStatus)
+            }}
+          />
         </motion.div>
-      )}
+
+        {/* Alerts */}
+        <motion.div variants={item}>
+          <ModernAlertCard alerts={Array.isArray(alerts) ? alerts : []} />
+        </motion.div>
+      </motion.div>
     </div>
   )
 }

@@ -43,7 +43,7 @@ def save_sensor_data(data):
     try:
         # Validate required fields
         if not all(key in data for key in ['device_id', 'sensor_type', 'value']):
-            raise ValueError("Missing required sensor data fields")        # Validate value type - allow strings for cover position
+            raise ValueError("Missing required sensor data fields")# Validate value type - allow strings for cover position
         sensor_type = data['sensor_type']
         if sensor_type.endswith('_status') and 'cover' in sensor_type:
             # For cover status, convert string positions to numeric values

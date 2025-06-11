@@ -71,14 +71,13 @@ export interface SensorHistoryData {
   value: number;
 }
 
-export const greenhouseAPI = {
-  async getSensorData(): Promise<SensorData> {
+export const greenhouseAPI = {  async getSensorData(): Promise<SensorData> {
     const response = await api.get<APIResponse<Array<{
       device_id: string;
       sensor_type: string;
       value: number;
       time: string;
-    }>>>('/api/sensors/latest');
+    }>>>('/api/sensors/latest?device_id=greenhouse_1');
     
     // Convert array format to object format
     const sensorData: SensorData = {
@@ -109,9 +108,7 @@ export const greenhouseAPI = {
   async updateDeviceState(deviceId: string, status: boolean): Promise<DeviceState> {
     const response = await api.post<APIResponse<DeviceState>>(`/api/devices/${deviceId}/control`, { status });
     return response.data.data;
-  },
-  
-  async controlDevice(deviceId: string, deviceType: string, status: boolean | string): Promise<any> {
+  },    async controlDevice(deviceId: string, deviceType: string, status: boolean | string): Promise<any> {
     const response = await api.post<APIResponse<any>>(`/api/devices/${deviceId}/control`, {
       device_type: deviceType,
       command: 'SET_STATE',
@@ -154,9 +151,21 @@ export const greenhouseAPI = {
     const response = await api.get<APIResponse<SensorHistoryData[]>>(`/api/dashboard/sensor-history?${params}`);
     return response.data.data;
   },
-
   async getDeviceStatus(): Promise<DeviceState[]> {
     const response = await api.get<APIResponse<DeviceState[]>>('/api/dashboard/device-status');
+    return response.data.data;
+  },
+
+  async applyConfiguration(config: any, configName: string): Promise<any> {
+    const response = await api.post<APIResponse<any>>('/api/devices/apply-config', {
+      config: config,
+      configName: configName
+    });
+    return response.data;
+  },
+
+  async getConfigurationPresets(): Promise<any> {
+    const response = await api.get<APIResponse<any>>('/api/configurations/presets');
     return response.data.data;
   }
 };

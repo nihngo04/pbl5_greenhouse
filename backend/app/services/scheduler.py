@@ -76,20 +76,17 @@ def _handle_device_timeout(task_id, device_id, duration_seconds, cancel_event):
             
             topic = f"greenhouse/control/{device_type}"  # Use device type not device_id
             success = mqtt_client.publish(topic, off_message)
-            
-            # Also update the device state in the database
+              # Also update the device state in the database
             try:
-                from app.services.timescale import save_sensor_data
+                from app.services.timescale import update_device_state
                 
-                # Save to database
-                sensor_data = {
-                    'device_id': device_id,
-                    'sensor_type': f"{device_type}_status",
-                    'value': 0,  # Off state
-                    'timestamp': datetime.now().isoformat()
-                }
-                save_sensor_data(sensor_data)
-                  # Note: Only sending control message, no status message as requested
+                # Update device_states table (NOT sensor_data table)
+                # Device control status should only be saved to device_states table
+                status_str = "false"  # Off state as string
+                update_device_state(device_id, device_type, status_str)
+                logger.info(f"Updated device_states for {device_id} with status: {status_str}")
+                
+                # Note: Only sending control message, no status message as requested
                 
             except Exception as db_error:
                 logger.error(f"Error updating device state in database: {str(db_error)}")

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -185,16 +185,52 @@ export default function Management() {
           { start: "06:00", end: "10:00", position: "open" },
           { start: "14:00", end: "18:00", position: "open" },
           { start: "18:00", end: "06:00", position: "open" },
-        ],
-      },
-    },
+        ],      },
+    },  }
+    // Load saved configurations from localStorage with fallback to defaults
+  const loadSavedConfigs = () => {
+    // Check if we're in the browser (client-side)
+    if (typeof window === 'undefined') {
+      return defaultConfigs
+    }
+    
+    try {
+      const savedConfigs = localStorage.getItem('greenhouse-configs')
+      if (savedConfigs) {
+        const parsed = JSON.parse(savedConfigs)
+        return { ...defaultConfigs, ...parsed }
+      }
+    } catch (error) {
+      console.error('Error loading saved configs:', error)
+    }
+    return defaultConfigs
   }
 
+  // Save configurations to localStorage
+  const saveConfigsToStorage = (configs: Record<string, DeviceState>) => {
+    // Check if we're in the browser (client-side)
+    if (typeof window === 'undefined') {
+      return
+    }
+    
+    try {
+      localStorage.setItem('greenhouse-configs', JSON.stringify(configs))
+    } catch (error) {
+      console.error('Error saving configs to storage:', error)
+    }
+  }
   const [configs, setConfigs] = useState<Record<string, DeviceState>>(defaultConfigs)
   const [selectedConfig, setSelectedConfig] = useState<string>("cay-non")
   const [currentConfig, setCurrentConfig] = useState<DeviceState>(defaultConfigs["cay-non"])
   const [newConfigName, setNewConfigName] = useState<string>("")
   const [showNewConfigDialog, setShowNewConfigDialog] = useState<boolean>(false)
+  // Cấu hình vận hành mới
+  const [showConfigSelector, setShowConfigSelector] = useState<boolean>(false)
+  const [selectedOperatingConfig, setSelectedOperatingConfig] = useState<string>("cay-non")
+  const [isConfigModified, setIsConfigModified] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [schedulerStatus, setSchedulerStatus] = useState<any>(null)
+  const [realTimeConditions, setRealTimeConditions] = useState<any>(null)
 
   // Cấu hình cảnh báo
   const [alertConfig, setAlertConfig] = useState<AlertState>({
@@ -221,36 +257,70 @@ export default function Management() {
   })
 
   type DeviceSection = 'pump' | 'fan' | 'cover';
-  type ScheduleSection = 'pump' | 'cover';
-
-  const handleConfigChange = (section: DeviceSection, field: string, value: number) => {
-    setCurrentConfig((prev) => ({
-      ...prev,
+  type ScheduleSection = 'pump' | 'cover';  const handleConfigChange = (section: DeviceSection, field: string, value: number) => {
+    // Update current config state
+    const updatedCurrentConfig = {
+      ...currentConfig,
       [section]: {
-        ...prev[section],
+        ...currentConfig[section],
         [field]: value,
       },
-    }))
+    }
+    setCurrentConfig(updatedCurrentConfig)
+    setIsConfigModified(true)
+    
+    // Auto-save changes to the selected configuration immediately
+    setConfigs((prevConfigs) => {
+      const newConfigs = {
+        ...prevConfigs,
+        [selectedConfig]: updatedCurrentConfig,
+      }
+      
+      // Save to localStorage
+      saveConfigsToStorage(newConfigs)
+      
+      // Show auto-save toast notification
+      showAutoSaveNotification(`Thay đổi ${field} trong cấu hình "${configs[selectedConfig].name}" đã được lưu tự động.`)
+      
+      return newConfigs
+    })
   }
-
   const handleScheduleChange = (
     section: ScheduleSection,
     index: number,
     field: 'time' | 'duration' | 'start' | 'end' | 'position',
     value: string | number
   ) => {
-    setCurrentConfig((prev) => {
-      const schedules = prev[section].schedules.map((schedule, i) =>
-        i === index ? { ...schedule, [field]: value } : schedule
-      )
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section],
-          schedules,
-        },
+    const newSchedules = currentConfig[section].schedules.map((schedule, i) =>
+      i === index ? { ...schedule, [field]: value } : schedule
+    )
+    
+    // Update current config state
+    const updatedCurrentConfig = {
+      ...currentConfig,
+      [section]: {
+        ...currentConfig[section],
+        schedules: newSchedules,
+      },
+    }
+    setCurrentConfig(updatedCurrentConfig)
+    
+    // Auto-save schedule changes to the selected configuration
+    setConfigs((prevConfigs) => {
+      const newConfigs = {
+        ...prevConfigs,
+        [selectedConfig]: updatedCurrentConfig,
       }
+      
+      // Save to localStorage
+      saveConfigsToStorage(newConfigs)
+        // Show auto-save toast notification
+      showAutoSaveNotification(`Thay đổi lịch trình ${section === 'pump' ? 'bơm tưới' : 'mái che'} đã được lưu vào cấu hình "${configs[selectedConfig].name}".`)
+      
+      return newConfigs
     })
+    
+    setIsConfigModified(true)
   }
 
   const handleAlertConfigChange = (parameter: string, field: string, value: any) => {
@@ -262,40 +332,68 @@ export default function Management() {
       },
     }))
   }
-
   const addSchedule = (section: ScheduleSection) => {
     const newSchedule = section === "pump" 
       ? { time: "12:00", duration: 5 } as PumpSchedule
       : { start: "12:00", end: "13:00", position: "open" } as CoverSchedule
 
-    setCurrentConfig((prev) => ({
-      ...prev,
+    const updatedCurrentConfig = {
+      ...currentConfig,
       [section]: {
-        ...prev[section],
-        schedules: [...prev[section].schedules, newSchedule],
+        ...currentConfig[section],
+        schedules: [...currentConfig[section].schedules, newSchedule],
       },
-    }))
+    }
+    
+    setCurrentConfig(updatedCurrentConfig)
+    
+    // Auto-save to localStorage
+    setConfigs((prevConfigs) => {
+      const newConfigs = {
+        ...prevConfigs,
+        [selectedConfig]: updatedCurrentConfig,
+      }
+      saveConfigsToStorage(newConfigs)
+      return newConfigs
+    })
   }
-
   const removeSchedule = (section: ScheduleSection, index: number) => {
-    setCurrentConfig((prev) => ({
-      ...prev,
+    const updatedCurrentConfig = {
+      ...currentConfig,
       [section]: {
-        ...prev[section],
-        schedules: prev[section].schedules.filter((_, i) => i !== index),
+        ...currentConfig[section],
+        schedules: currentConfig[section].schedules.filter((_, i) => i !== index),
       },
-    }))
+    }
+    
+    setCurrentConfig(updatedCurrentConfig)
+    
+    // Auto-save to localStorage
+    setConfigs((prevConfigs) => {
+      const newConfigs = {
+        ...prevConfigs,
+        [selectedConfig]: updatedCurrentConfig,
+      }
+      saveConfigsToStorage(newConfigs)
+      return newConfigs    })
   }
-
+  
   const handleSaveConfig = () => {
-    setConfigs((prev) => ({
-      ...prev,
-      [selectedConfig]: currentConfig,
-    }))
+    setConfigs((prev) => {
+      const newConfigs = {
+        ...prev,
+        [selectedConfig]: currentConfig,
+      }
+      // Save to localStorage
+      saveConfigsToStorage(newConfigs)
+      return newConfigs
+    })
+
+    setIsConfigModified(false)
 
     toast({
-      title: "Cài đặt đã được lưu thành công!",
-      description: `Cấu hình "${currentConfig.name}" đã được cập nhật`,
+      title: "Lưu thành công!",
+      description: `Cấu hình "${currentConfig.name}" đã được lưu và cập nhật. Các thay đổi sẽ được áp dụng vào lần chạy tiếp theo.`,
     })
   }
 
@@ -304,6 +402,74 @@ export default function Management() {
       title: "Cài đặt cảnh báo đã được lưu!",
       description: "Các ngưỡng cảnh báo đã được cập nhật",
     })
+  }
+  // Chức năng chọn cấu hình vận hành mới  
+  const handleSelectOperatingConfig = () => {
+    setShowConfigSelector(true)
+  }
+  const handleApplyOperatingConfig = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Apply configuration to the scheduler system
+      const response = await fetch('/api/devices/apply-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: configs[selectedOperatingConfig as keyof typeof configs],
+          configName: configs[selectedOperatingConfig as keyof typeof configs].name
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to apply configuration')
+      }
+
+      const result = await response.json()
+      
+      // Check scheduler status to confirm it's running
+      const statusResponse = await fetch('/api/configurations/scheduler/status')
+      let schedulerStatus = null
+      if (statusResponse.ok) {
+        const statusResult = await statusResponse.json()
+        schedulerStatus = statusResult.data
+      }
+
+      // Update local state  
+      setSelectedConfig(selectedOperatingConfig)
+      setCurrentConfig(configs[selectedOperatingConfig as keyof typeof configs])
+      
+      setShowConfigSelector(false)
+      setIsConfigModified(false)
+
+      toast({
+        title: "🎯 Cấu hình vận hành đã được áp dụng!",
+        description: `Đã chuyển sang cấu hình "${configs[selectedOperatingConfig as keyof typeof configs].name}" và khởi động hệ thống điều khiển tự động thông minh. Hệ thống sẽ tự động theo dõi cảm biến và điều khiển thiết bị theo ngưỡng đã cài đặt.`,
+        variant: "default"
+      })
+      
+      // Show additional success info
+      setTimeout(() => {
+        toast({
+          title: "✅ Hệ thống đang hoạt động",
+          description: schedulerStatus?.is_running 
+            ? "Bộ điều khiển tự động đang kiểm tra điều kiện môi trường mỗi 30 giây"
+            : "Đã lưu cấu hình thành công",
+          variant: "default"
+        })
+      }, 2000)
+        } catch (error) {
+      console.error('Error applying configuration:', error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể áp dụng cấu hình vận hành",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCreateNewConfig = () => {
@@ -322,13 +488,25 @@ export default function Management() {
       name: newConfigName,
     }
 
-    setConfigs((prev) => ({
-      ...prev,
-      [newConfigKey]: newConfig,
-    }))
+    setConfigs((prev) => {
+      const newConfigs = {
+        ...prev,
+        [newConfigKey]: newConfig,
+      }
+      // Save to localStorage
+      saveConfigsToStorage(newConfigs)
+      return newConfigs
+    })
 
     setSelectedConfig(newConfigKey)
     setCurrentConfig(newConfig)
+    
+    // Save selected config to localStorage
+    try {
+      localStorage.setItem('selected-config', newConfigKey)
+    } catch (error) {
+      console.error('Error saving selected config to localStorage:', error)
+    }
     setNewConfigName("")
     setShowNewConfigDialog(false)
 
@@ -337,17 +515,19 @@ export default function Management() {
       description: `Cấu hình "${newConfigName}" đã được tạo`,
     })
   }
-
-  const handleSelectConfig = (configKey: string) => {
+    const handleSelectConfig = (configKey: string) => {
     setSelectedConfig(configKey)
     setCurrentConfig(configs[configKey as keyof typeof configs])
+    
+    // Save selected config to localStorage (client-side only)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('selected-config', configKey)
+      } catch (error) {
+        console.error('Error saving selected config to localStorage:', error)
+      }
+    }
   }
-
-  const duplicateConfig = () => {
-    setNewConfigName(`${currentConfig.name} - Copy`)
-    setShowNewConfigDialog(true)
-  }
-
   const getPositionLabel = (position: string) => {
     switch (position) {
       case "closed":
@@ -358,6 +538,103 @@ export default function Management() {
         return "Mở (90°)"
       default:
         return "Mở (90°)"
+    }
+  }
+
+  // Auto-save notification handler with debouncing
+  const [autoSaveTimeoutId, setAutoSaveTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  
+  const showAutoSaveNotification = (message: string) => {
+    // Clear existing timeout
+    if (autoSaveTimeoutId) {
+      clearTimeout(autoSaveTimeoutId)
+    }
+    
+    // Set new timeout to show notification after a brief delay (to avoid spam)
+    const timeoutId = setTimeout(() => {
+      toast({
+        title: "✅ Tự động lưu",
+        description: message,
+        variant: "default"
+      })
+    }, 500)
+    
+    setAutoSaveTimeoutId(timeoutId)
+  }  // Fetch scheduler status on component mount
+  useEffect(() => {
+    // Load configurations from localStorage on client-side
+    const savedConfigs = loadSavedConfigs()
+    if (savedConfigs !== defaultConfigs) {
+      setConfigs(savedConfigs)
+    }
+    
+    // Load selected config from localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSelectedConfig = localStorage.getItem('selected-config')
+        if (savedSelectedConfig && savedConfigs[savedSelectedConfig]) {
+          setSelectedConfig(savedSelectedConfig)
+          setCurrentConfig(savedConfigs[savedSelectedConfig])
+        }
+      } catch (error) {
+        console.error('Error loading selected config:', error)
+      }
+    }
+    
+    fetchSchedulerStatus()
+    fetchRealTimeConditions()
+    
+    // Set up interval to refresh both scheduler status and real-time conditions
+    const interval = setInterval(() => {
+      fetchSchedulerStatus()
+      fetchRealTimeConditions()
+    }, 10000) // Every 10 seconds for real-time updates
+    
+    return () => clearInterval(interval)
+  }, [])
+  const fetchSchedulerStatus = async () => {
+    try {
+      const response = await fetch('/api/configurations/scheduler/status')
+      if (response.ok) {
+        const result = await response.json()
+        setSchedulerStatus(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching scheduler status:', error)
+    }
+  }
+  const fetchRealTimeConditions = async () => {
+    try {
+      const [sensorsResponse, devicesResponse] = await Promise.all([
+        fetch('/api/sensors/latest'),
+        fetch('/api/devices/status')
+      ])
+      
+      if (sensorsResponse.ok && devicesResponse.ok) {
+        const sensors = await sensorsResponse.json()
+        const devices = await devicesResponse.json()
+        
+        setRealTimeConditions({
+          sensors: sensors.data,
+          devices: devices.data,
+          timestamp: new Date().toISOString(),
+          isOnline: true
+        })      } else {
+        // Set offline status if API calls fail
+        setRealTimeConditions((prev: any) => prev ? {
+          ...prev,
+          isOnline: false,
+          timestamp: new Date().toISOString()
+        } : null)
+      }
+    } catch (error) {
+      console.error('Error fetching real-time conditions:', error)
+      // Set offline status on error
+      setRealTimeConditions((prev: any) => prev ? {
+        ...prev,
+        isOnline: false,
+        timestamp: new Date().toISOString()
+      } : null)
     }
   }
 
@@ -467,10 +744,9 @@ export default function Management() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <Button variant="outline" onClick={duplicateConfig}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Sao chép
+                  </div>                  <Button variant="outline" onClick={handleSelectOperatingConfig}>
+                    <Check className="mr-2 h-4 w-4" />
+                    Chọn cấu hình
                   </Button>
                   <Dialog open={showNewConfigDialog} onOpenChange={setShowNewConfigDialog}>
                     <DialogTrigger asChild>
@@ -481,9 +757,8 @@ export default function Management() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Tạo cấu hình mới</DialogTitle>
-                        <DialogDescription>
-                          Nhập tên cho cấu hình mới. Cấu hình sẽ được sao chép từ cấu hình hiện tại.
+                        <DialogTitle>Tạo cấu hình mới</DialogTitle>                        <DialogDescription>
+                          Nhập tên cho cấu hình mới. Cấu hình sẽ được chọn từ giai đoạn hiện tại.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -502,6 +777,83 @@ export default function Management() {
                           Hủy
                         </Button>
                         <Button onClick={handleCreateNewConfig}>Tạo cấu hình</Button>
+                      </DialogFooter>
+                    </DialogContent>                  </Dialog>
+
+                  {/* Configuration Selector Dialog */}
+                  <Dialog open={showConfigSelector} onOpenChange={setShowConfigSelector}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Chọn cấu hình vận hành</DialogTitle>
+                        <DialogDescription>
+                          Chọn giai đoạn phát triển của cây để áp dụng cấu hình tự động phù hợp
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="operating-config">Giai đoạn phát triển</Label>
+                          <Select value={selectedOperatingConfig} onValueChange={setSelectedOperatingConfig}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(configs).map(([key, config]) => (
+                                <SelectItem key={key} value={key}>
+                                  <div>
+                                    <div className="font-medium">{config.name}</div>
+                                    <div className="text-xs text-gray-500">
+                                      {key === 'cay-non' ? 'Tưới nhiều, chăm sóc cẩn thận' : 'Ít tưới hơn, thông gió tốt'}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Configuration Preview */}
+                        {selectedOperatingConfig && (
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <h4 className="font-medium mb-2">Chi tiết cấu hình:</h4>
+                            <div className="space-y-2 text-sm">
+                              <div>
+                                <span className="font-medium">Bơm tưới:</span> Ngưỡng {configs[selectedOperatingConfig as keyof typeof configs]?.pump?.soilMoistureThreshold}%, 
+                                {configs[selectedOperatingConfig as keyof typeof configs]?.pump?.schedules?.length} lịch tưới
+                              </div>
+                              <div>
+                                <span className="font-medium">Quạt:</span> Bật khi, 
+                                {configs[selectedOperatingConfig as keyof typeof configs]?.fan?.tempThreshold}°C hoặc, 
+                                {configs[selectedOperatingConfig as keyof typeof configs]?.fan?.humidityThreshold}% ẩm
+                              </div>
+                              <div>
+                                <span className="font-medium">Mái che:</span> Điều chỉnh khi, 
+                                {configs[selectedOperatingConfig as keyof typeof configs]?.cover?.tempThreshold}°C, 
+                                {configs[selectedOperatingConfig as keyof typeof configs]?.cover?.schedules?.length} lịch vị trí
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowConfigSelector(false)} disabled={isLoading}>
+                          Hủy
+                        </Button>
+                        <Button 
+                          onClick={handleApplyOperatingConfig} 
+                          className="bg-green-600 hover:bg-green-700"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                              Đang áp dụng...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" />
+                              Áp dụng cấu hình
+                            </>
+                          )}
+                        </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
@@ -1053,6 +1405,169 @@ export default function Management() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Scheduler Status Display */}
+      {schedulerStatus && (
+        <Card className="border-2 border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${schedulerStatus.is_running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              Trạng thái hệ thống điều khiển tự động
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Trạng thái</Label>
+                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  schedulerStatus.is_running 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {schedulerStatus.is_running ? '🟢 Đang hoạt động' : '🔴 Tạm dừng'}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Cấu hình hiện tại</Label>
+                <div className="text-sm font-medium text-blue-600">
+                  {schedulerStatus.current_config || 'Chưa có cấu hình'}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Kiểm tra mỗi</Label>
+                <div className="text-sm font-medium">
+                  {schedulerStatus.check_interval} giây
+                </div>
+              </div>
+            </div>
+              {schedulerStatus.is_running && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="text-sm text-blue-800">
+                  <strong>🤖 Hệ thống thông minh đang hoạt động:</strong>
+                  <ul className="mt-2 ml-4 space-y-1">
+                    <li>• Theo dõi nhiệt độ, độ ẩm, độ ẩm đất mỗi {schedulerStatus.check_interval} giây</li>
+                    <li>• Tự động bật/tắt bơm tưới khi độ ẩm đất thấp</li>
+                    <li>• Điều khiển quạt thông gió theo nhiệt độ và độ ẩm</li>
+                    <li>• Điều chỉnh mái che theo lịch trình và nhiệt độ</li>
+                  </ul>
+                </div>                {/* Real-time Conditions Display */}
+                {realTimeConditions && (
+                  <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-blue-900">
+                        📊 Điều kiện thực tế đang kiểm tra:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${realTimeConditions.isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-gray-500">
+                          {realTimeConditions.isOnline ? 'Trực tuyến' : 'Mất kết nối'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-blue-50 p-2 rounded">
+                        <div className="font-medium">🌡️ Nhiệt độ</div>
+                        <div className={`text-lg font-bold ${
+                          realTimeConditions.sensors?.temperature > currentConfig.fan.tempThreshold 
+                            ? 'text-red-600' : 'text-blue-700'
+                        }`}>
+                          {realTimeConditions.sensors?.temperature?.toFixed(1) || '--'}°C
+                        </div>
+                        <div className="text-gray-500">Ngưỡng: {currentConfig.fan.tempThreshold}°C</div>
+                        {realTimeConditions.sensors?.temperature > currentConfig.fan.tempThreshold && (
+                          <div className="text-xs text-red-600 font-medium">⚠️ Vượt ngưỡng</div>
+                        )}
+                      </div>
+                      <div className="bg-cyan-50 p-2 rounded">
+                        <div className="font-medium">💧 Độ ẩm</div>
+                        <div className={`text-lg font-bold ${
+                          realTimeConditions.sensors?.humidity > currentConfig.fan.humidityThreshold 
+                            ? 'text-red-600' : 'text-cyan-700'
+                        }`}>
+                          {realTimeConditions.sensors?.humidity?.toFixed(1) || '--'}%
+                        </div>
+                        <div className="text-gray-500">Ngưỡng: {currentConfig.fan.humidityThreshold}%</div>
+                        {realTimeConditions.sensors?.humidity > currentConfig.fan.humidityThreshold && (
+                          <div className="text-xs text-red-600 font-medium">⚠️ Vượt ngưỡng</div>
+                        )}
+                      </div>
+                      <div className="bg-green-50 p-2 rounded">
+                        <div className="font-medium">🌱 Độ ẩm đất</div>
+                        <div className={`text-lg font-bold ${
+                          realTimeConditions.sensors?.soil_moisture < currentConfig.pump.soilMoistureThreshold 
+                            ? 'text-red-600' : 'text-green-700'
+                        }`}>
+                          {realTimeConditions.sensors?.soil_moisture?.toFixed(1) || '--'}%
+                        </div>
+                        <div className="text-gray-500">Ngưỡng: {currentConfig.pump.soilMoistureThreshold}%</div>
+                        {realTimeConditions.sensors?.soil_moisture < currentConfig.pump.soilMoistureThreshold && (
+                          <div className="text-xs text-red-600 font-medium">⚠️ Dưới ngưỡng</div>
+                        )}
+                      </div>
+                      <div className="bg-yellow-50 p-2 rounded">
+                        <div className="font-medium">☀️ Ánh sáng</div>
+                        <div className="text-lg font-bold text-yellow-700">
+                          {realTimeConditions.sensors?.light_intensity?.toFixed(0) || '--'} lux
+                        </div>
+                        <div className="text-gray-500">Mái che: {currentConfig.cover.tempThreshold}°C</div>
+                      </div>
+                    </div>
+                      {/* Current Device Status */}
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <div className="text-sm font-medium text-blue-900 mb-2">
+                        🔧 Trạng thái thiết bị hiện tại:
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                        {realTimeConditions.devices?.map((device: any) => (
+                          <div key={device.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${
+                                device.status === 'true' || device.status === 'OPEN' || device.status === true
+                                  ? 'bg-green-500' : 'bg-gray-400'
+                              }`}></div>
+                              <span className="capitalize font-medium">
+                                {device.type === 'pump' ? '💧 Bơm' : device.type === 'fan' ? '🌀 Quạt' : device.type === 'cover' ? '☂️ Mái' : device.type}
+                              </span>
+                            </div>
+                            <span className={`font-medium px-2 py-1 rounded text-xs ${
+                              device.status === 'true' || device.status === 'OPEN' || device.status === true
+                                ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {device.status === 'true' || device.status === true ? 'Bật' : 
+                               device.status === 'OPEN' ? 'Mở' : 
+                               device.status === 'CLOSED' ? 'Đóng' : 
+                               device.status === 'HALF' ? 'Nửa' : 'Tắt'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <div>Cập nhật lần cuối: {new Date(realTimeConditions.timestamp).toLocaleTimeString()}</div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div>
+                        <span>Cập nhật mỗi 10 giây</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {!schedulerStatus.is_running && (
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                <div className="text-sm text-yellow-800">
+                  <strong>⚠️ Hệ thống tự động chưa hoạt động.</strong> 
+                  Vui lòng chọn và áp dụng cấu hình để kích hoạt điều khiển tự động.
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

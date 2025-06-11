@@ -79,9 +79,7 @@ def control_device(device_id):
             return jsonify({
                 'success': False,
                 'error': 'Invalid command format'
-            }), 400
-        
-        # Validate status based on device type
+            }), 400        # Validate status based on device type
         if device_type in ["pump", "fan"]:
             if not isinstance(command.get("status"), bool):
                 return jsonify({
@@ -93,7 +91,7 @@ def control_device(device_id):
                 return jsonify({
                     'success': False,
                     'error': 'Cover status must be "OPEN", "HALF", or "CLOSED"'
-                }), 400        # Prepare the MQTT message
+                }), 400# Prepare the MQTT message
         mqtt_message = {
             "device_id": device_id,
             "command": command["command"],
@@ -102,50 +100,21 @@ def control_device(device_id):
         }
           # Send the command to the MQTT broker
         topic = f"greenhouse/control/{device_type}"  # Use device type (pump, fan, cover) not device_id
-        success = mqtt_client.publish(topic, mqtt_message)
-          # Also update device state in database
+        success = mqtt_client.publish(topic, mqtt_message)        # Also update device state in database
         try:
-            from app.services.timescale import save_sensor_data            # Format the value based on device type
+            from app.services.timescale import update_device_state            # Update device_states table (NOT sensor_data table)
             if device_type in ["pump", "fan"]:
-                value = 1 if command["status"] else 0
-                
-                # Update device_states table with string representation for pump and fan
+                # For pump and fan, store boolean status as string
                 status_str = "true" if command["status"] else "false"
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        UPDATE device_states 
-                        SET status = :status, last_updated = CURRENT_TIMESTAMP 
-                        WHERE id = :device_id
-                    """), {
-                        'device_id': device_id,
-                        'status': status_str  # string value for database
-                    })
-                    logger.info(f"Updated device_states for {device_id} with status: {status_str}")
-            else:  # Cover
-                # For cover, store the position value directly
-                value = command["status"]
-                
+                update_device_state(device_id, device_type, status_str)
+                logger.info(f"Updated device_states for {device_id} with status: {status_str}")
+            elif device_type == "cover":
                 # For cover, store string status directly
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        UPDATE device_states 
-                        SET status = :status, last_updated = CURRENT_TIMESTAMP 
-                        WHERE id = :device_id
-                    """), {
-                        'device_id': device_id,
-                        'status': command["status"]  # string value (OPEN, HALF, CLOSED)
-                    })
-                    logger.info(f"Updated device_states for {device_id} with status: {command['status']}")
-                
-            # Save to database with appropriate type
-            sensor_data = {
-                'device_id': device_id,
-                'sensor_type': f"{device_type}_status",
-                'value': value,
-                'timestamp': datetime.now().isoformat()
-            }
-            save_sensor_data(sensor_data)
+                update_device_state(device_id, device_type, command["status"])
+                logger.info(f"Updated device_states for {device_id} with status: {command['status']}")
             
+            # Note: Device control status should ONLY be saved to device_states table,
+            # NOT to sensor_data table (which is for sensor readings only)
             # Note: Only sending control message, no status message as requested
             
         except Exception as db_error:

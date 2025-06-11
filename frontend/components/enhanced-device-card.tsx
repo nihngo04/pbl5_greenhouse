@@ -40,7 +40,7 @@ interface EnhancedDeviceCardProps {
   onToggle: () => void
   onManage: () => void
   variant: "fan" | "pump" | "cover"
-  onStatusChange?: (success: boolean) => void
+  onStatusChange?: (newStatus: string | boolean) => void  // Updated to pass new status
   loading?: boolean
 }
 
@@ -201,21 +201,22 @@ export function EnhancedDeviceCard({
                 onClick={handleSchedule}
               >
                 <Clock className="mr-2 h-4 w-4" />
-                Lên lịch
-              </Button>
+                Lên lịch              </Button>
             </div>
           </div>
-        )
+        );
       case 'cover':
         return (
           <div className="mt-4 space-y-4 pt-4 border-t border-gray-100">
             <div className="space-y-2">
-              <Label className="text-sm">Vị trí mái che:</Label>
-              <Select
+              <Label className="text-sm">Vị trí mái che:</Label>              <Select
                 value={coverPosition}
                 onValueChange={(value) => {
                   setCoverPosition(value);
-                  handleControl("SET_STATE", value);
+                  // Only call onStatusChange - let parent handle the API call
+                  if (onStatusChange) {
+                    onStatusChange(value);
+                  }
                 }}
               >
                 <SelectTrigger>
@@ -242,14 +243,15 @@ export function EnhancedDeviceCard({
             <div className={cn("rounded-full p-2", deviceVariants({ variant }))}>{icon}</div>
             <h3 className="text-base font-medium">{title}</h3>
           </div>          {variant === 'cover' ? (
-            <div className="flex items-center gap-2">
-              <Select
+            <div className="flex items-center gap-2">              <Select
                 value={coverPosition}
                 onValueChange={(value) => {
                   console.log(`Cover dropdown changed to: ${value}`);
                   setCoverPosition(value);
-                  // Call handleControl directly with the new value
-                  handleControl(variant, value);
+                  // Only call onStatusChange - let parent handle the API call
+                  if (onStatusChange) {
+                    onStatusChange(value);
+                  }
                 }}
                 disabled={loading}
               >

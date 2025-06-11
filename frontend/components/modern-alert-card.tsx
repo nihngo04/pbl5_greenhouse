@@ -23,8 +23,11 @@ export function ModernAlertCard({ alerts }: ModernAlertCardProps) {
 
   // Animate alerts appearing one by one
   useEffect(() => {
+    // Ensure alerts is an array and handle edge cases
+    const alertsArray = Array.isArray(alerts) ? alerts : []
+    
     setVisibleAlerts([])
-    const timers = alerts.map((alert, index) => {
+    const timers = alertsArray.map((alert, index) => {
       return setTimeout(() => {
         setVisibleAlerts((prev) => [...prev, alert])
       }, index * 300)
