@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Alert System - Greenhouse</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .danger-btn {
+            background-color: #dc3545;
+        }
+        .danger-btn:hover {
+            background-color: #c82333;
+        }
+        .warning-btn {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .warning-btn:hover {
+            background-color: #e0a800;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .sensor-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .sensor-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .threshold-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .threshold-input {
+            display: flex;
+            flex-direction: column;
+        }
+        .threshold-input label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .threshold-input input {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Test Alert System - Greenhouse</h1>
+        <p>Công cụ này giúp test hệ thống cảnh báo dựa trên ngưỡng cảm biến</p>
+
+        <div class="test-section info">
+            <h3>📋 Hướng dẫn Test</h3>
+            <ol>
+                <li>Mở Dashboard tại <a href="http://localhost:3000/dashboard" target="_blank">http://localhost:3000/dashboard</a></li>
+                <li>Mở Management tại <a href="http://localhost:3000/management" target="_blank">http://localhost:3000/management</a></li>
+                <li>Chuyển sang tab "Cảnh báo" để cấu hình ngưỡng</li>
+                <li>Sử dụng các button dưới đây để mô phỏng dữ liệu cảm biến</li>
+                <li>Quan sát cảnh báo xuất hiện trong Dashboard</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🎛️ Cấu hình ngưỡng cảnh báo</h3>
+            <p>Thiết lập ngưỡng để test cảnh báo:</p>
+            <div class="threshold-controls">
+                <div class="threshold-input">
+                    <label>Nhiệt độ - Cảnh báo (°C)</label>
+                    <input type="number" id="temp-warning" value="30" min="0" max="50">
+                </div>
+                <div class="threshold-input">
+                    <label>Nhiệt độ - Nguy hiểm (°C)</label>
+                    <input type="number" id="temp-danger" value="35" min="0" max="50">
+                </div>
+                <div class="threshold-input">
+                    <label>Độ ẩm - Cảnh báo (%)</label>
+                    <input type="number" id="humidity-warning" value="80" min="0" max="100">
+                </div>
+                <div class="threshold-input">
+                    <label>Độ ẩm - Nguy hiểm (%)</label>
+                    <input type="number" id="humidity-danger" value="90" min="0" max="100">
+                </div>
+                <div class="threshold-input">
+                    <label>Độ ẩm đất - Cảnh báo (%)</label>
+                    <input type="number" id="soil-warning" value="20" min="0" max="100">
+                </div>
+                <div class="threshold-input">
+                    <label>Độ ẩm đất - Nguy hiểm (%)</label>
+                    <input type="number" id="soil-danger" value="10" min="0" max="100">
+                </div>
+                <div class="threshold-input">
+                    <label>Ánh sáng - Cảnh báo (lux)</label>
+                    <input type="number" id="light-warning" value="9000" min="0" max="20000">
+                </div>
+                <div class="threshold-input">
+                    <label>Ánh sáng - Nguy hiểm (lux)</label>
+                    <input type="number" id="light-danger" value="9500" min="0" max="20000">
+                </div>
+            </div>
+            <button onclick="saveAlertConfig()">💾 Lưu cấu hình ngưỡng</button>
+            <div id="saveResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Trạng thái cảm biến hiện tại</h3>
+            <div class="sensor-display">
+                <div class="sensor-card">
+                    <h4>🌡️ Nhiệt độ</h4>
+                    <div id="current-temp">--°C</div>
+                </div>
+                <div class="sensor-card">
+                    <h4>💧 Độ ẩm</h4>
+                    <div id="current-humidity">--%</div>
+                </div>
+                <div class="sensor-card">
+                    <h4>🌱 Độ ẩm đất</h4>
+                    <div id="current-soil">--%</div>
+                </div>
+                <div class="sensor-card">
+                    <h4>☀️ Ánh sáng</h4>
+                    <div id="current-light">-- lux</div>
+                </div>
+            </div>
+            <button onclick="refreshSensorData()">🔄 Làm mới dữ liệu</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Mô phỏng dữ liệu cảm biến</h3>
+            <p>Gửi dữ liệu test để kích hoạt cảnh báo:</p>
+            
+            <h4>Nhiệt độ:</h4>
+            <button onclick="sendSensorData('temperature', 25)">🟢 Bình thường (25°C)</button>
+            <button class="warning-btn" onclick="sendSensorData('temperature', 32)">🟡 Cảnh báo (32°C)</button>
+            <button class="danger-btn" onclick="sendSensorData('temperature', 38)">🔴 Nguy hiểm (38°C)</button>
+            
+            <h4>Độ ẩm:</h4>
+            <button onclick="sendSensorData('humidity', 70)">🟢 Bình thường (70%)</button>
+            <button class="warning-btn" onclick="sendSensorData('humidity', 85)">🟡 Cảnh báo (85%)</button>
+            <button class="danger-btn" onclick="sendSensorData('humidity', 95)">🔴 Nguy hiểm (95%)</button>
+            
+            <h4>Độ ẩm đất:</h4>
+            <button onclick="sendSensorData('soil_moisture', 60)">🟢 Bình thường (60%)</button>
+            <button class="warning-btn" onclick="sendSensorData('soil_moisture', 18)">🟡 Cảnh báo (18%)</button>
+            <button class="danger-btn" onclick="sendSensorData('soil_moisture', 8)">🔴 Nguy hiểm (8%)</button>
+            
+            <h4>Cường độ ánh sáng:</h4>
+            <button onclick="sendSensorData('light_intensity', 7000)">🟢 Bình thường (7000 lux)</button>
+            <button class="warning-btn" onclick="sendSensorData('light_intensity', 9200)">🟡 Cảnh báo (9200 lux)</button>
+            <button class="danger-btn" onclick="sendSensorData('light_intensity', 9800)">🔴 Nguy hiểm (9800 lux)</button>
+            
+            <h4>Các tình huống khác:</h4>
+            <button onclick="sendRandomData()">🎲 Dữ liệu ngẫu nhiên</button>
+            <button onclick="sendNormalData()">✅ Dữ liệu bình thường</button>
+            <button onclick="sendMultipleAlerts()">⚠️ Nhiều cảnh báo cùng lúc</button>
+            
+            <div id="testResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Kiểm tra LocalStorage</h3>
+            <button onclick="checkAlertConfig()">Xem cấu hình cảnh báo</button>
+            <button onclick="clearAlertConfig()">Xóa cấu hình cảnh báo</button>
+            <div id="localStorageResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // Gửi dữ liệu cảm biến test
+        async function sendSensorData(sensorType, value) {
+            try {
+                const response = await fetch('/api/sensors/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sensor_type: sensorType,
+                        value: value,
+                        device_id: 'test-device-1'
+                    }),
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="success">✅ Đã gửi ${sensorType}: ${value}</div>`;
+                    refreshSensorData();
+                } else {
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="error">❌ Lỗi: ${result.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = 
+                    `<div class="error">❌ Lỗi kết nối: ${error.message}</div>`;
+            }
+        }
+
+        // Gửi nhiều dữ liệu ngẫu nhiên
+        async function sendRandomData() {
+            const sensors = [
+                { type: 'temperature', value: Math.random() * 50 },
+                { type: 'humidity', value: Math.random() * 100 },
+                { type: 'soil_moisture', value: Math.random() * 100 },
+                { type: 'light_intensity', value: Math.random() * 15000 }
+            ];
+
+            for (const sensor of sensors) {
+                await sendSensorData(sensor.type, Math.round(sensor.value * 10) / 10);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        // Gửi dữ liệu bình thường
+        async function sendNormalData() {
+            await sendSensorData('temperature', 25);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('humidity', 65);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('soil_moisture', 45);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('light_intensity', 6000);
+        }
+
+        // Gửi nhiều cảnh báo cùng lúc
+        async function sendMultipleAlerts() {
+            await sendSensorData('temperature', 40);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('humidity', 95);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('soil_moisture', 5);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await sendSensorData('light_intensity', 10000);
+        }
+
+        // Làm mới dữ liệu cảm biến
+        async function refreshSensorData() {
+            try {
+                const response = await fetch('/api/sensors/latest');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    document.getElementById('current-temp').textContent = 
+                        data.temperature ? `${data.temperature.toFixed(1)}°C` : '--°C';
+                    document.getElementById('current-humidity').textContent = 
+                        data.humidity ? `${data.humidity.toFixed(1)}%` : '--%';
+                    document.getElementById('current-soil').textContent = 
+                        data.soil_moisture ? `${data.soil_moisture.toFixed(1)}%` : '--%';
+                    document.getElementById('current-light').textContent = 
+                        data.light_intensity ? `${data.light_intensity.toFixed(0)} lux` : '-- lux';
+                }
+            } catch (error) {
+                console.error('Error refreshing sensor data:', error);
+            }
+        }
+
+        // Lưu cấu hình cảnh báo
+        function saveAlertConfig() {
+            const alertConfig = {
+                temperature: {
+                    warning: parseInt(document.getElementById('temp-warning').value),
+                    danger: parseInt(document.getElementById('temp-danger').value),
+                    enabled: true
+                },
+                humidity: {
+                    warning: parseInt(document.getElementById('humidity-warning').value),
+                    danger: parseInt(document.getElementById('humidity-danger').value),
+                    enabled: true
+                },
+                soilMoisture: {
+                    warning: parseInt(document.getElementById('soil-warning').value),
+                    danger: parseInt(document.getElementById('soil-danger').value),
+                    enabled: true
+                },
+                light: {
+                    warning: parseInt(document.getElementById('light-warning').value),
+                    danger: parseInt(document.getElementById('light-danger').value),
+                    enabled: true
+                }
+            };
+
+            localStorage.setItem('alert-config', JSON.stringify(alertConfig));
+            document.getElementById('saveResult').innerHTML = 
+                '<div class="success">✅ Cấu hình đã được lưu vào LocalStorage</div>';
+        }
+
+        // Kiểm tra cấu hình cảnh báo trong LocalStorage
+        function checkAlertConfig() {
+            const alertConfig = localStorage.getItem('alert-config');
+            const result = document.getElementById('localStorageResult');
+            
+            if (alertConfig) {
+                try {
+                    const config = JSON.parse(alertConfig);
+                    let html = '<h4>📋 Cấu hình cảnh báo hiện tại:</h4>';
+                    html += `<pre>${JSON.stringify(config, null, 2)}</pre>`;
+                    result.innerHTML = `<div class="success">${html}</div>`;
+                } catch (e) {
+                    result.innerHTML = `<div class="error">❌ Lỗi parse JSON: ${e.message}</div>`;
+                }
+            } else {
+                result.innerHTML = '<div class="error">❌ Không tìm thấy cấu hình cảnh báo</div>';
+            }
+        }
+
+        // Xóa cấu hình cảnh báo
+        function clearAlertConfig() {
+            localStorage.removeItem('alert-config');
+            document.getElementById('localStorageResult').innerHTML = 
+                '<div class="success">✅ Đã xóa cấu hình cảnh báo</div>';
+        }
+
+        // Tự động làm mới dữ liệu khi tải trang
+        window.onload = function() {
+            refreshSensorData();
+            // Tự động làm mới mỗi 5 giây
+            setInterval(refreshSensorData, 5000);
+        };
+    </script>
+</body>
+</html>

@@ -6,12 +6,12 @@
 "use client"
 
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw, Clock, Database, Zap } from 'lucide-react';
+import { RefreshCw, Clock, Database, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGlobalState } from '@/lib/global-state';
-import { useAutoSync } from '@/lib/mqtt-sync';
+import { useDataSync } from '@/lib/useDataSync';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const GlobalStateStatus: React.FC = () => {
@@ -23,8 +23,6 @@ export const GlobalStateStatus: React.FC = () => {
     syncFromAPI 
   } = useGlobalState();
   
-  const { isConnected, lastSync: autoSyncLastSync } = useAutoSync();
-  
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return 'Chưa đồng bộ';
     const diff = Date.now() - new Date(timestamp).getTime();
@@ -33,21 +31,21 @@ export const GlobalStateStatus: React.FC = () => {
     return new Date(timestamp).toLocaleTimeString();
   };
   
-  const isDataFresh = lastSync && Date.now() - new Date(lastSync).getTime() < 30000;
+  const isDataFresh = lastSync && Date.now() - new Date(lastSync).getTime() < 10000; // 10 seconds for API polling
   
   return (
     <TooltipProvider>
       <div className="flex items-center space-x-2 text-xs">
-        {/* MQTT Connection Status */}
+        {/* Auto Sync Status */}
         <Tooltip>
           <TooltipTrigger>
-            <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center">
-              {isConnected ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
-              MQTT
+            <Badge variant={isDataFresh ? "default" : "secondary"} className="flex items-center">
+              <Clock className="w-3 h-3 mr-1" />
+              Auto Sync
             </Badge>
           </TooltipTrigger>
           <TooltipContent>
-            {isConnected ? 'Kết nối MQTT thành công - Dữ liệu real-time' : 'Mất kết nối MQTT - Sử dụng API polling'}
+            {isDataFresh ? 'Đồng bộ tự động mỗi 10 giây' : 'Đang chờ đồng bộ...'}
           </TooltipContent>
         </Tooltip>
         
@@ -71,7 +69,7 @@ export const GlobalStateStatus: React.FC = () => {
             Đang tải
           </Badge>
         )}
-          {/* Manual Sync Button */}
+        {/* Manual Sync Button */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button 
@@ -95,20 +93,19 @@ export const GlobalStateStatus: React.FC = () => {
 
 export const PerformanceIndicator: React.FC = () => {
   const { lastSync } = useGlobalState();
-  const { isConnected } = useAutoSync();
   
-  // Calculate load time simulation
-  const estimatedLoadTime = isConnected ? 0.5 : (lastSync ? 2 : 7);
+  // API polling takes about 2 seconds on average
+  const estimatedLoadTime = lastSync ? 2 : 7;
   
   const getPerformanceColor = (time: number) => {
-    if (time < 1) return 'text-green-600';
-    if (time < 3) return 'text-yellow-600';
+    if (time < 3) return 'text-green-600';
+    if (time < 5) return 'text-yellow-600';
     return 'text-red-600';
   };
   
   const getPerformanceIcon = (time: number) => {
-    if (time < 1) return <Zap className="w-4 h-4" />;
-    if (time < 3) return <Clock className="w-4 h-4" />;
+    if (time < 3) return <Zap className="w-4 h-4" />;
+    if (time < 5) return <Clock className="w-4 h-4" />;
     return <RefreshCw className="w-4 h-4" />;
   };
   
@@ -126,7 +123,6 @@ export const PerformanceIndicator: React.FC = () => {
         <TooltipContent>
           <div className="text-xs">
             <div className="font-medium mb-1">Thời gian tải dữ liệu ước tính:</div>
-            <div>• Với MQTT: ~0.5s (real-time)</div>
             <div>• Với cache: ~2s (đã đồng bộ)</div>
             <div>• Không cache: ~7s (load từ API)</div>
           </div>
@@ -143,7 +139,8 @@ export const DataOverview: React.FC = () => {
     <Card className="w-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center justify-between">
-          <span>Trạng thái dữ liệu</span>          <div className="flex items-center space-x-2">
+          <span>Trạng thái dữ liệu</span>
+          <div className="flex items-center space-x-2">
             <PerformanceIndicator />
           </div>
         </CardTitle>

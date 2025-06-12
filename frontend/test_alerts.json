@@ -1,0 +1,72 @@
+[
+  {
+    "id": "1",
+    "message": "⚠️ Nhiệt độ cao: 32°C (>30°C)",
+    "type": "warning",
+    "timestamp": "2025-06-11T18:49:03.889256",
+    "acknowledged": false
+  },
+  {
+    "id": "2",
+    "message": "⚠️ Độ ẩm cao: 85% (>80%)",
+    "type": "warning",
+    "timestamp": "2025-06-11T18:49:03.889284",
+    "acknowledged": false
+  },
+  {
+    "id": "3",
+    "message": "⚠️ Độ ẩm đất thấp: 25% (<30%)",
+    "type": "warning",
+    "timestamp": "2025-06-11T18:49:03.889288",
+    "acknowledged": false
+  },
+  {
+    "id": "4",
+    "message": "⚠️ Ánh sáng cao: 16000 lux (>15000 lux)",
+    "type": "warning",
+    "timestamp": "2025-06-11T18:49:03.889291",
+    "acknowledged": false
+  },
+  {
+    "id": "5",
+    "message": "🌡️ Nhiệt độ nguy hiểm: 40°C (>35°C)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.890224",
+    "acknowledged": false
+  },
+  {
+    "id": "6",
+    "message": "💧 Độ ẩm nguy hiểm: 95% (>90%)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.890230",
+    "acknowledged": false
+  },
+  {
+    "id": "7",
+    "message": "🌱 Độ ẩm đất nguy hiểm: 15% (<20%)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.890235",
+    "acknowledged": false
+  },
+  {
+    "id": "8",
+    "message": "☀️ Ánh sáng nguy hiểm: 20000 lux (>18000 lux)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.890238",
+    "acknowledged": false
+  },
+  {
+    "id": "9",
+    "message": "🌡️ Nhiệt độ nguy hiểm: 36°C (>35°C)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.891565",
+    "acknowledged": false
+  },
+  {
+    "id": "10",
+    "message": "🌱 Độ ẩm đất nguy hiểm: 18% (<20%)",
+    "type": "danger",
+    "timestamp": "2025-06-11T18:49:03.891572",
+    "acknowledged": false
+  }
+]

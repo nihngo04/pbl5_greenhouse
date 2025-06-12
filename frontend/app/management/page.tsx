@@ -79,12 +79,12 @@ interface AlertState {
     danger: number
     enabled: boolean
   }
-  soilMoisture: {
+  soil_moisture: {
     warning: number
     danger: number
     enabled: boolean
   }
-  light: {
+  light_intensity: {
     warning: number
     danger: number
     enabled: boolean
@@ -231,7 +231,6 @@ export default function Management() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [schedulerStatus, setSchedulerStatus] = useState<any>(null)
   const [realTimeConditions, setRealTimeConditions] = useState<any>(null)
-
   // Cấu hình cảnh báo
   const [alertConfig, setAlertConfig] = useState<AlertState>({
     temperature: {
@@ -244,12 +243,12 @@ export default function Management() {
       danger: 90,
       enabled: true,
     },
-    soilMoisture: {
+    soil_moisture: {
       warning: 20,
       danger: 10,
       enabled: true,
     },
-    light: {
+    light_intensity: {
       warning: 9000,
       danger: 9500,
       enabled: true,
@@ -396,8 +395,16 @@ export default function Management() {
       description: `Cấu hình "${currentConfig.name}" đã được lưu và cập nhật. Các thay đổi sẽ được áp dụng vào lần chạy tiếp theo.`,
     })
   }
-
   const handleSaveAlertConfig = () => {
+    // Lưu cấu hình cảnh báo vào localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('alert-config', JSON.stringify(alertConfig))
+      } catch (error) {
+        console.error('Error saving alert config to localStorage:', error)
+      }
+    }
+    
     toast({
       title: "Cài đặt cảnh báo đã được lưu!",
       description: "Các ngưỡng cảnh báo đã được cập nhật",
@@ -576,8 +583,15 @@ export default function Management() {
           setSelectedConfig(savedSelectedConfig)
           setCurrentConfig(savedConfigs[savedSelectedConfig])
         }
+        
+        // Load alert config from localStorage
+        const savedAlertConfig = localStorage.getItem('alert-config')
+        if (savedAlertConfig) {
+          const parsedAlertConfig = JSON.parse(savedAlertConfig)
+          setAlertConfig(parsedAlertConfig)
+        }
       } catch (error) {
-        console.error('Error loading selected config:', error)
+        console.error('Error loading configs from localStorage:', error)
       }
     }
     
@@ -915,10 +929,9 @@ export default function Management() {
                         <Plus className="mr-1 h-4 w-4" />
                         Thêm lịch
                       </Button>
-                    </div>
-                    <div className="space-y-3">
+                    </div>                    <div className="space-y-3">
                       {currentConfig.pump.schedules.map((schedule: any, index: number) => (
-                        <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
+                        <div key={`pump-schedule-${index}`} className="flex items-center gap-4 p-3 border rounded-lg">
                           <div className="flex items-center gap-2">
                             <Label className="text-sm">Thời gian:</Label>
                             <Input
@@ -1021,15 +1034,6 @@ export default function Management() {
                         className="w-20"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <Label>Kiểm tra mỗi (phút)</Label>
-                      <Input
-                        type="number"
-                        value={currentConfig.fan.checkInterval}
-                        onChange={(e) => handleConfigChange("fan", "checkInterval", Number(e.target.value))}
-                        className="w-20"
-                      />
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1075,10 +1079,9 @@ export default function Management() {
                         <Plus className="mr-1 h-4 w-4" />
                         Thêm lịch
                       </Button>
-                    </div>
-                    <div className="space-y-3">
+                    </div>                    <div className="space-y-3">
                       {currentConfig.cover.schedules.map((schedule: any, index: number) => (
-                        <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
+                        <div key={`cover-schedule-${index}`} className="flex items-center gap-4 p-3 border rounded-lg">
                           <div className="flex items-center gap-2">
                             <Label className="text-sm">Từ:</Label>
                             <Input
@@ -1107,9 +1110,9 @@ export default function Management() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="closed">Đóng (180°)</SelectItem>
-                                <SelectItem value="half-open">Mở vừa (60°)</SelectItem>
-                                <SelectItem value="open">Mở (90°)</SelectItem>
+                                <SelectItem value="closed">Đóng</SelectItem>
+                                <SelectItem value="half-open">Mở vừa</SelectItem>
+                                <SelectItem value="open">Mở</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1300,16 +1303,15 @@ export default function Management() {
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <Label>Ngưỡng cảnh báo (thấp)</Label>
-                      <div className="flex items-center gap-4">
-                        <Input
+                      <div className="flex items-center gap-4">                        <Input
                           type="number"
-                          value={alertConfig.soilMoisture.warning}
-                          onChange={(e) => handleAlertConfigChange("soilMoisture", "warning", Number(e.target.value))}
+                          value={alertConfig.soil_moisture.warning}
+                          onChange={(e) => handleAlertConfigChange("soil_moisture", "warning", Number(e.target.value))}
                           className="w-20"
                         />
                         <Slider
-                          value={[alertConfig.soilMoisture.warning]}
-                          onValueChange={(value) => handleAlertConfigChange("soilMoisture", "warning", value[0])}
+                          value={[alertConfig.soil_moisture.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("soil_moisture", "warning", value[0])}
                           min={0}
                           max={100}
                           step={1}
@@ -1319,16 +1321,15 @@ export default function Management() {
                     </div>
                     <div className="space-y-3">
                       <Label>Ngưỡng nguy hiểm (thấp)</Label>
-                      <div className="flex items-center gap-4">
-                        <Input
+                      <div className="flex items-center gap-4">                        <Input
                           type="number"
-                          value={alertConfig.soilMoisture.danger}
-                          onChange={(e) => handleAlertConfigChange("soilMoisture", "danger", Number(e.target.value))}
+                          value={alertConfig.soil_moisture.danger}
+                          onChange={(e) => handleAlertConfigChange("soil_moisture", "danger", Number(e.target.value))}
                           className="w-20"
                         />
                         <Slider
-                          value={[alertConfig.soilMoisture.danger]}
-                          onValueChange={(value) => handleAlertConfigChange("soilMoisture", "danger", value[0])}
+                          value={[alertConfig.soil_moisture.danger]}
+                          onValueChange={(value) => handleAlertConfigChange("soil_moisture", "danger", value[0])}
                           min={0}
                           max={100}
                           step={1}
@@ -1354,16 +1355,15 @@ export default function Management() {
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <Label>Ngưỡng cảnh báo (cao)</Label>
-                      <div className="flex items-center gap-4">
-                        <Input
+                      <div className="flex items-center gap-4">                        <Input
                           type="number"
-                          value={alertConfig.light.warning}
-                          onChange={(e) => handleAlertConfigChange("light", "warning", Number(e.target.value))}
+                          value={alertConfig.light_intensity.warning}
+                          onChange={(e) => handleAlertConfigChange("light_intensity", "warning", Number(e.target.value))}
                           className="w-24"
                         />
                         <Slider
-                          value={[alertConfig.light.warning]}
-                          onValueChange={(value) => handleAlertConfigChange("light", "warning", value[0])}
+                          value={[alertConfig.light_intensity.warning]}
+                          onValueChange={(value) => handleAlertConfigChange("light_intensity", "warning", value[0])}
                           min={0}
                           max={10000}
                           step={100}
@@ -1373,16 +1373,15 @@ export default function Management() {
                     </div>
                     <div className="space-y-3">
                       <Label>Ngưỡng nguy hiểm (rất cao)</Label>
-                      <div className="flex items-center gap-4">
-                        <Input
+                      <div className="flex items-center gap-4">                        <Input
                           type="number"
-                          value={alertConfig.light.danger}
-                          onChange={(e) => handleAlertConfigChange("light", "danger", Number(e.target.value))}
+                          value={alertConfig.light_intensity.danger}
+                          onChange={(e) => handleAlertConfigChange("light_intensity", "danger", Number(e.target.value))}
                           className="w-24"
                         />
                         <Slider
-                          value={[alertConfig.light.danger]}
-                          onValueChange={(value) => handleAlertConfigChange("light", "danger", value[0])}
+                          value={[alertConfig.light_intensity.danger]}
+                          onValueChange={(value) => handleAlertConfigChange("light_intensity", "danger", value[0])}
                           min={0}
                           max={10000}
                           step={100}
@@ -1445,7 +1444,7 @@ export default function Management() {
               {schedulerStatus.is_running && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <div className="text-sm text-blue-800">
-                  <strong>🤖 Hệ thống thông minh đang hoạt động:</strong>
+                  <strong>Hệ thống thông minh đang hoạt động:</strong>
                   <ul className="mt-2 ml-4 space-y-1">
                     <li>• Theo dõi nhiệt độ, độ ẩm, độ ẩm đất mỗi {schedulerStatus.check_interval} giây</li>
                     <li>• Tự động bật/tắt bơm tưới khi độ ẩm đất thấp</li>
@@ -1457,7 +1456,7 @@ export default function Management() {
                   <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-medium text-blue-900">
-                        📊 Điều kiện thực tế đang kiểm tra:
+                        Điều kiện thực tế đang kiểm tra:
                       </div>
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${realTimeConditions.isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
@@ -1469,12 +1468,6 @@ export default function Management() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                       <div className="bg-blue-50 p-2 rounded">
                         <div className="font-medium">🌡️ Nhiệt độ</div>
-                        <div className={`text-lg font-bold ${
-                          realTimeConditions.sensors?.temperature > currentConfig.fan.tempThreshold 
-                            ? 'text-red-600' : 'text-blue-700'
-                        }`}>
-                          {realTimeConditions.sensors?.temperature?.toFixed(1) || '--'}°C
-                        </div>
                         <div className="text-gray-500">Ngưỡng: {currentConfig.fan.tempThreshold}°C</div>
                         {realTimeConditions.sensors?.temperature > currentConfig.fan.tempThreshold && (
                           <div className="text-xs text-red-600 font-medium">⚠️ Vượt ngưỡng</div>
@@ -1482,12 +1475,6 @@ export default function Management() {
                       </div>
                       <div className="bg-cyan-50 p-2 rounded">
                         <div className="font-medium">💧 Độ ẩm</div>
-                        <div className={`text-lg font-bold ${
-                          realTimeConditions.sensors?.humidity > currentConfig.fan.humidityThreshold 
-                            ? 'text-red-600' : 'text-cyan-700'
-                        }`}>
-                          {realTimeConditions.sensors?.humidity?.toFixed(1) || '--'}%
-                        </div>
                         <div className="text-gray-500">Ngưỡng: {currentConfig.fan.humidityThreshold}%</div>
                         {realTimeConditions.sensors?.humidity > currentConfig.fan.humidityThreshold && (
                           <div className="text-xs text-red-600 font-medium">⚠️ Vượt ngưỡng</div>
@@ -1495,12 +1482,6 @@ export default function Management() {
                       </div>
                       <div className="bg-green-50 p-2 rounded">
                         <div className="font-medium">🌱 Độ ẩm đất</div>
-                        <div className={`text-lg font-bold ${
-                          realTimeConditions.sensors?.soil_moisture < currentConfig.pump.soilMoistureThreshold 
-                            ? 'text-red-600' : 'text-green-700'
-                        }`}>
-                          {realTimeConditions.sensors?.soil_moisture?.toFixed(1) || '--'}%
-                        </div>
                         <div className="text-gray-500">Ngưỡng: {currentConfig.pump.soilMoistureThreshold}%</div>
                         {realTimeConditions.sensors?.soil_moisture < currentConfig.pump.soilMoistureThreshold && (
                           <div className="text-xs text-red-600 font-medium">⚠️ Dưới ngưỡng</div>
@@ -1508,9 +1489,6 @@ export default function Management() {
                       </div>
                       <div className="bg-yellow-50 p-2 rounded">
                         <div className="font-medium">☀️ Ánh sáng</div>
-                        <div className="text-lg font-bold text-yellow-700">
-                          {realTimeConditions.sensors?.light_intensity?.toFixed(0) || '--'} lux
-                        </div>
                         <div className="text-gray-500">Mái che: {currentConfig.cover.tempThreshold}°C</div>
                       </div>
                     </div>
@@ -1520,8 +1498,8 @@ export default function Management() {
                         🔧 Trạng thái thiết bị hiện tại:
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                        {realTimeConditions.devices?.map((device: any) => (
-                          <div key={device.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        {realTimeConditions.devices?.map((device: any, index: number) => (
+                          <div key={`device-${device.id || device.type || index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                             <div className="flex items-center gap-2">
                               <div className={`w-3 h-3 rounded-full ${
                                 device.status === 'true' || device.status === 'OPEN' || device.status === true

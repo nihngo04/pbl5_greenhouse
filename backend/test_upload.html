@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Disease Detection Image Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .result { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .image-container { margin: 10px 0; }
+        img { max-width: 400px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input[type="file"] { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Disease Detection Test</h1>
+        
+        <h2>Upload Image</h2>
+        <input type="file" id="imageInput" accept="image/*">
+        <button onclick="uploadImage()">Upload & Analyze</button>
+        
+        <div id="result" class="result" style="display: none;">
+            <h3>Results</h3>
+            <div id="resultText"></div>
+            <div class="image-container">
+                <h4>Original Image</h4>
+                <img id="originalImage" src="" alt="Original" style="display: none;">
+            </div>
+            <div class="image-container">
+                <h4>Predicted Image</h4>
+                <img id="predictedImage" src="" alt="Predicted" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select an image first');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            try {
+                console.log('Uploading image...');
+                const response = await fetch('/api/disease-detection/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Result:', result);
+                
+                displayResult(result);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('resultText').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                document.getElementById('result').style.display = 'block';
+            }
+        }
+        
+        function displayResult(result) {
+            const resultDiv = document.getElementById('result');
+            const resultText = document.getElementById('resultText');
+            const originalImg = document.getElementById('originalImage');
+            const predictedImg = document.getElementById('predictedImage');
+            
+            let html = `
+                <p><strong>Status:</strong> ${result.status}</p>
+                <p><strong>Message:</strong> ${result.message}</p>
+                <p><strong>AI Results:</strong> ${result.ai_results ? result.ai_results.length : 0} detections</p>
+            `;
+            
+            if (result.ai_results && result.ai_results.length > 0) {
+                html += '<h4>Detections:</h4><ul>';
+                result.ai_results.forEach(ai => {
+                    html += `<li>${ai.predicted_class} (${(ai.confidence * 100).toFixed(1)}% confidence)</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            resultText.innerHTML = html;
+            
+            // Display images
+            if (result.download_url) {
+                originalImg.src = result.download_url;
+                originalImg.style.display = 'block';
+                originalImg.onerror = () => {
+                    console.error('Failed to load original image:', result.download_url);
+                };
+            }
+            
+            if (result.predicted_url) {
+                predictedImg.src = result.predicted_url;
+                predictedImg.style.display = 'block';
+                predictedImg.onerror = () => {
+                    console.error('Failed to load predicted image:', result.predicted_url);
+                };
+            } else {
+                document.querySelector('#predictedImage').parentElement.innerHTML += '<p style="color: orange;">No predicted image available</p>';
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

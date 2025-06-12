@@ -21,20 +21,27 @@ def get_device_status():
             """))
             devices = []
             for row in result:
-                # Convert status based on device type
                 status = row.status
-                if row.type in ['fan', 'pump']:
-                    # Convert string to boolean for fan and pump
-                    status = status.lower() == 'true' if isinstance(status, str) else bool(status)
-                # For cover, keep string value (OPEN, HALF, CLOSED)
+                device_type = row.type.lower()
                 
+                # Format status based on device type
+                if device_type in ['fan', 'pump']:
+                    # Convert to strict boolean true/false
+                    status = str(status).lower() == 'true'
+                else:  # cover
+                    # Always return uppercase string for cover
+                    status = str(status).upper()
+                    if status not in ['OPEN', 'HALF', 'CLOSED']:
+                        status = 'CLOSED'  # default value
+
                 devices.append({
-                    'id': row.id,
-                    'type': row.type,
+                    'device_id': row.id,
+                    'type': device_type,
                     'name': row.name,
                     'status': status,
-                    'last_updated': row.last_updated.isoformat()
-                })              # Use safe encoding for Unicode device names in debug logs
+                    'timestamp': row.last_updated.isoformat()
+                })
+                logger.debug(f"Device status: {row.id} ({device_type}) = {status}")
             try:
                 safe_log_msg = f"Returning {len(devices)} device statuses"
                 logger.debug(safe_log_msg)

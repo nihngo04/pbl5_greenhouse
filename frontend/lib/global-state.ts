@@ -2,12 +2,13 @@
  * Global State Management System for Greenhouse Application
  * Giải quyết vấn đề:
  * 1. Performance: Tránh load lại dữ liệu mỗi lần switch tab
- * 2. Data Sync: Đồng bộ dữ liệu real-time qua MQTT
+ * 2. Data Sync: Đồng bộ dữ liệu thông qua API polling
  * 3. Conflict Handling: Xử lý xung đột giữa scheduler và manual control
  */
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { useEffect } from 'react';
 
 // Types
 export interface SensorValues {
@@ -65,8 +66,7 @@ interface GlobalState {
   clearConflicts: () => void;
   setLoading: (loading: boolean) => void;
   
-  // Sync actions
-  syncFromMQTT: (topic: string, payload: any) => void;
+  // Sync action - API polling every 10 seconds
   syncFromAPI: () => Promise<void>;
   
   // Conflict detection
@@ -138,77 +138,178 @@ export const useGlobalState = create<GlobalState>()(
     
     clearConflicts: () => set({ conflicts: [] }),
     
-    setLoading: (loading) => set({ isLoading: loading }),
-    
-    // MQTT sync handler
-    syncFromMQTT: (topic, payload) => {
-      console.log(`📡 MQTT SYNC: ${topic}`, payload);
-      
-      try {
-        // Parse MQTT message and update state accordingly
-        if (topic.includes('sensors')) {
-          const sensorType = topic.split('/').pop();
-          if (sensorType && payload.value !== undefined) {
-            get().updateSensors({
-              [sensorType]: payload.value
-            });
-          }
-        } else if (topic.includes('devices') && topic.includes('status')) {
-          const deviceId = topic.split('/')[2]; // greenhouse/devices/fan1/status
-          const deviceType = deviceId.replace('1', ''); // fan1 -> fan
-          
-          if (['pump', 'fan', 'cover'].includes(deviceType)) {
-            get().updateDevices({
-              [deviceType]: payload.status || payload.value
-            });
-          }
-        }
-      } catch (error) {
-        console.error('❌ MQTT sync error:', error);
-      }
-    },
-    
-    // API sync handler
+    setLoading: (loading) => set({ isLoading: loading }),    // API sync handler - unified 5s interval for both sensors and devices
     syncFromAPI: async () => {
       const state = get();
       state.setLoading(true);
       
+      // Define expected types
+      type SensorData = {
+        sensor_type: keyof Omit<SensorValues, 'lastUpdate'>;
+        value: number;
+      };
+
+      type DeviceData = {
+        device_id: string;
+        type: keyof Omit<DeviceStatus, 'lastUpdate'>;
+        status: boolean | 'OPEN' | 'HALF' | 'CLOSED';
+        timestamp: string;
+      };
+      
       try {
-        console.log('🔄 API SYNC: Fetching latest data...');
-          // Fetch sensor data
+        // Helper to validate sensor data
+        const validateSensorData = (data: unknown): data is SensorData[] => {
+          if (!Array.isArray(data)) {
+            console.error('❌ Invalid sensor data format: not an array');
+            return false;
+          }
+          return data.every(sensor => 
+            sensor &&
+            typeof sensor === 'object' &&
+            'sensor_type' in sensor &&
+            'value' in sensor &&
+            typeof sensor.sensor_type === 'string' &&
+            typeof sensor.value === 'number' &&
+            ['temperature', 'humidity', 'soil_moisture', 'light_intensity'].includes(sensor.sensor_type)
+          );
+        };
+
+        // Helper to validate device data
+        const validateDeviceData = (data: unknown): data is DeviceData[] => {
+          if (!Array.isArray(data)) {
+            console.error('❌ Invalid device data format: not an array');
+            return false;
+          }
+          return data.every(device => 
+            device &&
+            typeof device === 'object' &&
+            'device_id' in device &&
+            'type' in device &&
+            'status' in device &&
+            'timestamp' in device &&
+            typeof device.device_id === 'string' &&
+            typeof device.type === 'string' &&
+            typeof device.timestamp === 'string' &&
+            ['pump', 'fan', 'cover'].includes(device.type) &&
+            (
+              (device.type === 'cover' && 
+               typeof device.status === 'string' && 
+               ['OPEN', 'HALF', 'CLOSED'].includes(device.status)) ||
+              (device.type !== 'cover' && typeof device.status === 'boolean')
+            )
+          );
+        };
+
+        // Fetch and process sensor data
+        console.log('🔄 Data Sync: Fetching sensor data...');
         const sensorResponse = await fetch('/api/sensors/latest');
         if (sensorResponse.ok) {
           const result = await sensorResponse.json();
-          if (result.success && result.data) {
-            // Convert array format to object format
-            const sensorUpdates: any = {};
-            result.data.forEach((sensor: any) => {
-              sensorUpdates[sensor.sensor_type] = sensor.value;
-            });
-            
-            state.updateSensors(sensorUpdates);
-            console.log('📊 Sensor data updated:', sensorUpdates);
+          console.log('📥 Raw sensor response:', result);
+          
+          if (result.success && result.data && validateSensorData(result.data)) {
+            try {
+              const sensorUpdates: Partial<SensorValues> = {};
+              const validSensorTypes = ['temperature', 'humidity', 'soil_moisture', 'light_intensity'] as const;
+              
+              for (const sensor of result.data) {
+                console.log('Processing sensor:', sensor);
+                
+                // Validate sensor value
+                if (typeof sensor.value === 'number' && !isNaN(sensor.value)) {
+                  const sensorType = sensor.sensor_type;
+                  if (validSensorTypes.includes(sensorType as any)) {
+                    sensorUpdates[sensorType as keyof SensorValues] = sensor.value;
+                    console.log(`✅ Valid sensor update for ${sensorType}:`, sensor.value);
+                  } else {
+                    console.error(`❌ Invalid sensor type: ${sensorType}`);
+                  }
+                } else {
+                  console.error(`❌ Invalid sensor value for ${sensor.sensor_type}:`, sensor.value);
+                }
+              }
+              
+              // Only update if we have valid sensor data
+              if (Object.keys(sensorUpdates).length > 0) {
+                console.log('📊 Applying validated sensor updates:', sensorUpdates);
+                state.updateSensors(sensorUpdates);
+              } else {
+                console.warn('⚠️ No valid sensor updates to apply');
+              }
+            } catch (error) {
+              console.error('❌ Error processing sensor data:', error);
+            }
+          } else {
+            console.error('❌ Invalid or missing sensor data in response');
           }
+        } else {
+          console.error('❌ Sensor API request failed:', sensorResponse.statusText);
         }
-        
-        // Fetch device status
+
+        // Fetch and process device status
+        console.log('🔄 Data Sync: Fetching device status...');
         const deviceResponse = await fetch('/api/devices/status');
         if (deviceResponse.ok) {
-          const deviceData = await deviceResponse.json();
-          if (deviceData.data) {
-            const devices = deviceData.data.reduce((acc: any, device: any) => {
-              const type = device.type;
-              acc[type] = device.status;
-              return acc;
-            }, {});
-            
-            state.updateDevices(devices);
+          const deviceResult = await deviceResponse.json();
+          console.log('📥 Raw device response:', deviceResult);
+          
+          if (deviceResult.success && deviceResult.data && validateDeviceData(deviceResult.data)) {
+            // Group devices by type and get most recent status
+            const deviceUpdates: Partial<DeviceStatus> = {};
+            const processedTypes = new Set<keyof DeviceStatus>();
+
+            // Sort by timestamp descending to get most recent first
+            const sortedDevices = [...deviceResult.data].sort(
+              (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );            // Only take the first (most recent) status for each device type
+            for (const device of sortedDevices) {
+              const deviceType = device.type as keyof DeviceStatus;
+              if (!processedTypes.has(deviceType)) {
+                console.log(`Processing ${deviceType} status:`, device);
+                
+                // Validate and convert status based on device type
+                if (deviceType === 'cover') {
+                  const coverStatus = String(device.status).toUpperCase();
+                  if (['OPEN', 'HALF', 'CLOSED'].includes(coverStatus)) {
+                    deviceUpdates[deviceType as 'cover'] = coverStatus as 'OPEN' | 'HALF' | 'CLOSED';
+                  } else {
+                    console.error(`Invalid cover status: ${device.status}`);
+                    continue;
+                  }
+                } else {
+                  // For pump and fan, ensure boolean
+                  if (typeof device.status === 'boolean') {
+                    deviceUpdates[deviceType as 'pump' | 'fan'] = device.status;
+                  } else if (typeof device.status === 'string') {
+                    deviceUpdates[deviceType as 'pump' | 'fan'] = device.status.toLowerCase() === 'true';
+                  } else {
+                    console.error(`Invalid ${deviceType} status: ${device.status}`);
+                    continue;
+                  }
+                }
+                
+                processedTypes.add(deviceType);
+                console.log(`Updated ${deviceType} status to:`, deviceUpdates[deviceType]);
+              }
+            }
+              console.log('🔧 Validated device updates:', deviceUpdates);
+            const hasUpdates = Object.keys(deviceUpdates).length > 0;
+            if (hasUpdates) {
+              console.log('✅ Applying device updates:', deviceUpdates);
+              state.updateDevices(deviceUpdates);
+            } else {
+              console.warn('⚠️ No valid device updates to apply');
+            }
+          } else {
+            console.error('❌ Invalid or missing device data in response');
           }
+        } else {
+          console.error('❌ Device API request failed:', deviceResponse.statusText);
         }
-        
-        console.log('✅ API SYNC: Complete');
+
+        console.log('✅ Data Sync: Complete');
       } catch (error) {
-        console.error('❌ API SYNC ERROR:', error);
+        console.error('❌ Data Sync Error:', error);
       } finally {
         state.setLoading(false);
       }
@@ -258,18 +359,28 @@ export const useConflictDetection = () => {
   };
 };
 
-// Hook để sync dữ liệu
+// Unified sync hook with 5s interval for both sensors and devices
 export const useDataSync = () => {
   const syncFromAPI = useGlobalState(state => state.syncFromAPI);
-  const syncFromMQTT = useGlobalState(state => state.syncFromMQTT);
   const isLoading = useGlobalState(state => state.isLoading);
   const lastSync = useGlobalState(state => state.lastSync);
   
+  useEffect(() => {
+    console.log('🔄 Setting up unified API polling (5s interval)...');
+    
+    // Initial fetch
+    syncFromAPI();
+
+    // Set up unified polling interval (5 seconds)
+    const interval = setInterval(syncFromAPI, 5000);
+
+    return () => clearInterval(interval);
+  }, [syncFromAPI]);
+  
   return {
     syncFromAPI,
-    syncFromMQTT,
     isLoading,
     lastSync,
-    needsSync: !lastSync || Date.now() - new Date(lastSync).getTime() > 30000 // 30 seconds
+    needsSync: !lastSync || Date.now() - new Date(lastSync).getTime() > 5000
   };
 };

@@ -8,11 +8,12 @@ import { EnhancedDeviceCard } from '@/components/enhanced-device-card'
 import { ModernGaugeCard } from '@/components/modern-gauge-card'
 import { ModernAlertCard } from '@/components/modern-alert-card'
 import { SystemStatusCard } from '@/components/system-status-card'
-import { useGlobalState, useDataSync, useConflictDetection } from '@/lib/global-state'
+import { useGlobalState, useConflictDetection } from '@/lib/global-state'
+import { useDataSync } from '@/lib/useDataSync'
 import { useSchedulerStatus } from '@/hooks/use-scheduler-status'
+import { useAlertMonitoring } from '@/hooks/use-alert-monitoring'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert } from '@/lib/api'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -20,10 +21,8 @@ export default function Dashboard() {
   const sensors = useGlobalState(state => state.sensors)
   const devices = useGlobalState(state => state.devices)
   const isLoading = useGlobalState(state => state.isLoading)
-  const lastSync = useGlobalState(state => state.lastSync)
-  
-  // Data sync hooks
-  const { syncFromAPI, needsSync } = useDataSync()
+  const lastSync = useGlobalState(state => state.lastSync)  // Unified data sync hook
+  const { lastSync: dataSync } = useDataSync() // 5-second polling for both sensors and devices
   
   // Conflict detection
   const { conflicts, hasConflicts, resolveConflict } = useConflictDetection()
@@ -34,47 +33,11 @@ export default function Dashboard() {
     cacheStatus,
     loading: schedulerLoading 
   } = useSchedulerStatus()
-  
-  // Local loading state for device control
+    // Local loading state for device control
   const [controlLoading, setControlLoading] = useState<string | null>(null)
-  const [alerts, setAlerts] = useState<Alert[]>([])
-
-  // Initial data fetch
-  useEffect(() => {
-    console.log('🚀 Dashboard: Initial data fetch')
-    syncFromAPI()
-    
-    // Also fetch alerts
-    fetchAlerts()
-  }, [])
-
-  // Periodic sync (only if needed)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (needsSync) {
-        console.log('🔄 Dashboard: Periodic sync triggered')
-        syncFromAPI()
-      } else {
-        console.log('📋 Dashboard: Using cached data, no sync needed')
-      }
-    }, 30000) // Check every 30 seconds, but only sync if needed
-
-    return () => clearInterval(interval)
-  }, [needsSync, syncFromAPI])
   
-  const fetchAlerts = async () => {
-    try {
-      const response = await fetch('/api/alerts')
-      if (response.ok) {
-        const alertData = await response.json()
-        // Ensure alertData is an array
-        setAlerts(Array.isArray(alertData) ? alertData : [])
-      }
-    } catch (error) {
-      console.log('Alerts API not available')
-      setAlerts([]) // Ensure it's always an array
-    }
-  }
+  // Alert monitoring hook
+  const { alerts } = useAlertMonitoring()  // No need for additional periodic sync - handled by useDataSync hook and useAlertMonitoring hooks
 
   // Device control handler with conflict detection and immediate UI update
   const handleDeviceControl = async (deviceId: string, deviceType: string, newStatus: boolean | string) => {

@@ -1,0 +1,6 @@
+1749632422: mosquitto version 2.0.21 starting
+1749632422: Config loaded from mosquitto.conf.
+1749632422: Opening ipv6 listen socket on port 1883.
+1749632422: Opening ipv4 listen socket on port 1883.
+1749632422: Opening websockets listen socket on port 9001.
+1749632422: mosquitto version 2.0.21 running

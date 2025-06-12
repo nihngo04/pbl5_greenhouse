@@ -19,19 +19,29 @@ def create_app(config_class=Config):
     
     # Đảm bảo các thư mục cần thiết tồn tại
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
-    # Initialize extensions
+      # Initialize extensions
     db.init_app(app)
     CORS(app)
     
     with app.app_context():
+        # Import models to ensure tables are created
+        from app.models.detection_history import DetectionHistory, DetectionStatistics
+        from app.models.detection import DetectionResult, AIResult
+        
         # Create database tables
         db.create_all()
-          # Register error handlers
-        register_error_handlers(app)        # Initialize MQTT client on-demand (to prevent startup hanging)
+        
+        # Register error handlers
+        register_error_handlers(app)
+        
+        # Initialize MQTT client on-demand (to prevent startup hanging)
         # MQTT will be initialized when first requested
-        app.logger.info("MQTT client will be initialized on first use")        # Register blueprints
+        app.logger.info("MQTT client will be initialized on first use")
+        
+        # Register blueprints
         from app.api import sensors, images, monitoring, control, devices, dashboard, scheduler, notifications, configurations
+        from app.api.disease_detection import bp as disease_detection_bp
+        
         app.register_blueprint(sensors.bp)
         app.register_blueprint(images.bp)
         app.register_blueprint(monitoring.bp)
@@ -41,6 +51,7 @@ def create_app(config_class=Config):
         app.register_blueprint(scheduler.bp)
         app.register_blueprint(notifications.bp)
         app.register_blueprint(configurations.bp)
+        app.register_blueprint(disease_detection_bp)
         
         @app.route('/health')
         def health_check():

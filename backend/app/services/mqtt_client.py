@@ -50,15 +50,13 @@ class MQTTClient:
         if rc == 0:
             self.connected = True
             logger.info("Connected to MQTT broker successfully")
-            mqtt_monitor.on_connect()
-            
-            # Subscribe to unified sensor and device topics
+            mqtt_monitor.on_connect()            # Subscribe to unified sensor and device topics
             topics = [
                 "greenhouse/sensors/",  # For sensor data
-                "greenhouse/devices/"   # For device status data
+                "greenhouse/devices/"   # For device status data (batch updates)
             ]
             for topic in topics:
-                self.client.subscribe(topic, qos=0)  # Changed from QoS 1 to 0
+                self.client.subscribe(topic, qos=0)
                 logger.debug(f"Subscribed to topic: {topic}")
         else:
             logger.error(f"Failed to connect to MQTT broker with code: {rc}")
@@ -86,9 +84,7 @@ class MQTTClient:
                 for old_msg in oldest_messages:
                     self.processed_messages.remove(old_msg)
             
-            logger.debug(f"Received message on topic {topic}: {payload}")
-
-            # Process based on topic
+            logger.debug(f"Received message on topic {topic}: {payload}")            # Process based on topic
             if topic == "greenhouse/sensors/":
                 success = self._process_sensors_data(payload)
                 if success:
@@ -137,48 +133,77 @@ class MQTTClient:
                 # Save to database
                 save_sensor_data(formatted_data)
                 self.last_values[sensor['type']] = sensor['value']
-                
                 logger.debug(f"Processed sensor {sensor['type']}: {sensor['value']}")
-            
             return True
         except Exception as e:
             logger.error(f"Error processing sensors data: {e}")
             return False
-
+            
     def _process_devices_data(self, payload: dict):
-        """Process batch device data from greenhouse/devices/"""
+        """Process batch device status updates from greenhouse/devices/"""
         try:
             if 'devices' not in payload:
                 logger.error("No 'devices' field in payload")
                 return False
                 
             devices = payload['devices']
-            for device in devices:
-                # Validate required fields
-                if not all(field in device for field in ['type', 'device_id', 'status', 'time']):
-                    logger.error(f"Missing required fields in device data: {device}")
-                    continue
-                
-                # Convert status to numeric value for database
-                status_value = self._convert_device_status(device['status'])
-                
-                # Format device data for database
-                formatted_data = {
-                    'device_id': device['device_id'],
-                    'sensor_type': f"{device['type'].lower()}_status",
-                    'value': status_value,
-                    'timestamp': device['time']
-                }
-                
-                # Save to database
-                save_sensor_data(formatted_data)
-                
-                # Also update device_states table
-                self._update_device_state(device)
-                
-                logger.debug(f"Processed device {device['type']}: {device['status']}")
-            
-            return True
+            if not isinstance(devices, list):
+                logger.error("'devices' field is not a list")
+                return False
+
+            success = True
+            for device_data in devices:
+                try:
+                    # Validate required fields
+                    required_fields = ['type', 'device_id', 'status', 'time']
+                    if not all(field in device_data for field in required_fields):
+                        logger.error(f"Missing required fields in device data: {device_data}")
+                        success = False
+                        continue                    # Validate device type
+                    device_type = device_data['type'].lower()
+                    if device_type not in ['pump', 'fan', 'cover']:
+                        logger.error(f"Invalid device type: {device_type}")
+                        success = False
+                        continue
+                    
+                    # Validate status based on device type
+                    status = device_data['status']
+                    if device_type in ['pump', 'fan']:
+                        if isinstance(status, str):
+                            status = status.lower() == 'true'
+                        elif not isinstance(status, bool):
+                            logger.error(f"Invalid status for {device_type}: {status}")
+                            success = False
+                            continue
+                    elif device_type == 'cover':
+                        if isinstance(status, str):
+                            status = status.upper()
+                            if status not in ['OPEN', 'HALF', 'CLOSED']:
+                                logger.error(f"Invalid cover position: {status}")
+                                success = False
+                                continue
+                        else:
+                            logger.error(f"Invalid cover status type: {type(status)}")
+                            success = False
+                            continue
+
+                    # Process device update
+                    device = {
+                        'device_id': device_data['device_id'],
+                        'type': device_type,
+                        'status': status,
+                        'time': device_data['time']
+                    }
+                    
+                    # Update device status in device_states table only
+                    self._update_device_state(device)
+                    
+                    logger.info(f"Updated device state: {device['device_id']} ({device['type']}) = {device['status']}")
+                except Exception as e:
+                    logger.error(f"Error processing device {device_data.get('device_id', 'unknown')}: {e}")
+                    success = False
+                    
+            return success
         except Exception as e:
             logger.error(f"Error processing devices data: {e}")
             return False
@@ -206,8 +231,18 @@ class MQTTClient:
             engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
             
             with engine.begin() as conn:
-                # Convert status for device_states table
-                status_str = str(device['status']).lower() if isinstance(device['status'], bool) else device['status']
+                device_type = device['type'].lower()
+                
+                # Format status according to device type
+                if device_type in ['pump', 'fan']:
+                    # Convert to boolean for pump and fan
+                    status = str(device['status']).lower() == 'true' if isinstance(device['status'], str) else bool(device['status'])
+                    status_str = str(status).lower()
+                else:  # cover
+                    # Ensure uppercase string for cover
+                    status_str = str(device['status']).upper()
+                    if status_str not in ['OPEN', 'HALF', 'CLOSED']:
+                        status_str = 'CLOSED'  # default value
                 
                 conn.execute(text("""
                     INSERT INTO device_states (id, type, name, status, last_updated)
@@ -217,8 +252,8 @@ class MQTTClient:
                         last_updated = EXCLUDED.last_updated
                 """), {
                     'device_id': device['device_id'],
-                    'type': device['type'].lower(),
-                    'name': self._get_device_name(device['type'], device['device_id']),
+                    'type': device_type,
+                    'name': self._get_device_name(device_type, device['device_id']),
                     'status': status_str
                 })
                 

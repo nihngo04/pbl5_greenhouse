@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Alert System Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .alert { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .danger { background-color: #fee; border: 1px solid #f00; }
+        .warning { background-color: #ffa; border: 1px solid #fa0; }
+        .info { background-color: #eff; border: 1px solid #00f; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Alert System Debug</h1>
+    
+    <h2>Current Sensor Data</h2>
+    <div id="sensorData">Loading...</div>
+    
+    <h2>Alert Configuration</h2>
+    <div id="alertConfig">Loading...</div>
+    
+    <h2>Generated Alerts</h2>
+    <div id="alerts">No alerts</div>
+    
+    <h2>Send Test Data</h2>
+    <button onclick="sendTestData()">Send Extreme Values</button>
+    
+    <h2>Debug Log</h2>
+    <pre id="debugLog"></pre>
+
+    <script>
+        let debugLog = [];
+        
+        function log(message) {
+            console.log(message);
+            debugLog.push(new Date().toLocaleTimeString() + ': ' + message);
+            document.getElementById('debugLog').textContent = debugLog.join('\n');
+        }
+        
+        async function fetchSensorData() {
+            try {
+                const response = await fetch('/api/sensors/latest?device_id=greenhouse_1');
+                const data = await response.json();
+                log('Fetched sensor data: ' + JSON.stringify(data, null, 2));
+                
+                if (data.success) {
+                    let html = '<ul>';
+                    data.data.forEach(sensor => {
+                        html += `<li>${sensor.sensor_type}: ${sensor.value}</li>`;
+                    });
+                    html += '</ul>';
+                    document.getElementById('sensorData').innerHTML = html;
+                    return data.data;
+                }
+            } catch (error) {
+                log('Error fetching sensor data: ' + error);
+            }
+            return null;
+        }
+        
+        function getAlertConfig() {
+            const saved = localStorage.getItem('alert-config');
+            let config;
+            if (saved) {
+                config = JSON.parse(saved);
+                log('Loaded alert config from localStorage: ' + JSON.stringify(config, null, 2));            } else {
+                config = {
+                    temperature: { warning: 30, danger: 35, enabled: true },
+                    humidity: { warning: 80, danger: 90, enabled: true },
+                    soil_moisture: { warning: 20, danger: 10, enabled: true },
+                    light_intensity: { warning: 9000, danger: 9500, enabled: true }
+                };
+                log('Using default alert config: ' + JSON.stringify(config, null, 2));
+            }
+            
+            let html = '<pre>' + JSON.stringify(config, null, 2) + '</pre>';
+            document.getElementById('alertConfig').innerHTML = html;
+            return config;
+        }
+        
+        function generateAlerts(sensorData, alertConfig) {
+            const alerts = [];
+            log('Generating alerts for sensor data...');
+            
+            // Convert array to object format
+            const sensors = {};
+            sensorData.forEach(sensor => {
+                sensors[sensor.sensor_type] = sensor.value;
+            });
+            
+            log('Converted sensors: ' + JSON.stringify(sensors, null, 2));
+            
+            // Check temperature
+            if (alertConfig.temperature.enabled && sensors.temperature !== null && sensors.temperature !== undefined) {
+                log(`Temperature check: ${sensors.temperature} vs danger:${alertConfig.temperature.danger} warning:${alertConfig.temperature.warning}`);
+                if (sensors.temperature >= alertConfig.temperature.danger) {
+                    alerts.push({
+                        id: 'temp-danger',
+                        message: `Nhiệt độ quá cao: ${sensors.temperature.toFixed(1)}°C (ngưỡng nguy hiểm: ${alertConfig.temperature.danger}°C)`,
+                        type: 'danger',
+                        sensorType: 'temperature'
+                    });
+                } else if (sensors.temperature >= alertConfig.temperature.warning) {
+                    alerts.push({
+                        id: 'temp-warning',
+                        message: `Nhiệt độ cao: ${sensors.temperature.toFixed(1)}°C (ngưỡng cảnh báo: ${alertConfig.temperature.warning}°C)`,
+                        type: 'warning',
+                        sensorType: 'temperature'
+                    });
+                }
+            }
+            
+            // Check humidity
+            if (alertConfig.humidity.enabled && sensors.humidity !== null && sensors.humidity !== undefined) {
+                log(`Humidity check: ${sensors.humidity} vs danger:${alertConfig.humidity.danger} warning:${alertConfig.humidity.warning}`);
+                if (sensors.humidity >= alertConfig.humidity.danger) {
+                    alerts.push({
+                        id: 'humidity-danger',
+                        message: `Độ ẩm quá cao: ${sensors.humidity.toFixed(1)}% (ngưỡng nguy hiểm: ${alertConfig.humidity.danger}%)`,
+                        type: 'danger',
+                        sensorType: 'humidity'
+                    });
+                } else if (sensors.humidity >= alertConfig.humidity.warning) {
+                    alerts.push({
+                        id: 'humidity-warning',
+                        message: `Độ ẩm cao: ${sensors.humidity.toFixed(1)}% (ngưỡng cảnh báo: ${alertConfig.humidity.warning}%)`,
+                        type: 'warning',
+                        sensorType: 'humidity'
+                    });
+                }
+            }
+              // Check soil moisture
+            if (alertConfig.soil_moisture.enabled && sensors.soil_moisture !== null && sensors.soil_moisture !== undefined) {
+                log(`Soil moisture check: ${sensors.soil_moisture} vs danger:${alertConfig.soil_moisture.danger} warning:${alertConfig.soil_moisture.warning}`);
+                if (sensors.soil_moisture <= alertConfig.soil_moisture.danger) {
+                    alerts.push({
+                        id: 'soil-danger',
+                        message: `Độ ẩm đất quá thấp: ${sensors.soil_moisture.toFixed(1)}% (ngưỡng nguy hiểm: ${alertConfig.soil_moisture.danger}%)`,
+                        type: 'danger',
+                        sensorType: 'soil_moisture'
+                    });
+                } else if (sensors.soil_moisture <= alertConfig.soil_moisture.warning) {
+                    alerts.push({
+                        id: 'soil-warning',
+                        message: `Độ ẩm đất thấp: ${sensors.soil_moisture.toFixed(1)}% (ngưỡng cảnh báo: ${alertConfig.soil_moisture.warning}%)`,
+                        type: 'warning',
+                        sensorType: 'soil_moisture'
+                    });
+                }
+            }
+            
+            log('Generated alerts: ' + JSON.stringify(alerts, null, 2));
+            return alerts;
+        }
+        
+        function displayAlerts(alerts) {
+            let html = '';
+            if (alerts.length === 0) {
+                html = '<p>No alerts</p>';
+            } else {
+                alerts.forEach(alert => {
+                    html += `<div class="alert ${alert.type}">${alert.message}</div>`;
+                });
+            }
+            document.getElementById('alerts').innerHTML = html;
+        }
+        
+        async function refresh() {
+            log('Refreshing data...');
+            const sensorData = await fetchSensorData();
+            const alertConfig = getAlertConfig();
+            
+            if (sensorData && alertConfig) {
+                const alerts = generateAlerts(sensorData, alertConfig);
+                displayAlerts(alerts);
+            }
+        }
+        
+        async function sendTestData() {
+            log('Sending test data...');
+            
+            const testValues = [
+                { sensor_type: 'temperature', value: 42.0 },
+                { sensor_type: 'humidity', value: 96.0 },
+                { sensor_type: 'soil_moisture', value: 2.0 },
+                { sensor_type: 'light_intensity', value: 9800.0 }
+            ];
+            
+            for (const test of testValues) {
+                try {
+                    const response = await fetch('/api/sensors/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            device_id: 'greenhouse_1',
+                            sensor_type: test.sensor_type,
+                            value: test.value,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                    const result = await response.json();
+                    log(`Sent ${test.sensor_type}: ${test.value} - ${result.success ? 'Success' : 'Failed'}`);
+                } catch (error) {
+                    log(`Error sending ${test.sensor_type}: ${error}`);
+                }
+            }
+            
+            // Wait a bit then refresh
+            setTimeout(refresh, 1000);
+        }
+        
+        // Initialize
+        refresh();
+        setInterval(refresh, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html>
